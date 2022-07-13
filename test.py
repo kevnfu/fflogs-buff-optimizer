@@ -74,7 +74,9 @@ query {{
 }}
 """
 
-reportCode = "XZdRqnWAPBGQf3jg"
+# reportCode = "XZdRqnWAPBGQf3jg"
+# reportCode = "7WtwbQyvpFDA2RhZ"
+reportCode = "rHq4kRnmKcbpgwZY"
 
 # auth = HTTPBasicAuth(CLIENT_ID, CLIENT_SECRET)
 client = oauth2.BackendApplicationClient(CLIENT_ID)
@@ -104,8 +106,6 @@ class Report:
     endTime: int
     bosses: dict()
     fights: list()
-
-
 
 @dataclass
 class Fight:
@@ -166,15 +166,15 @@ def get_report(code):
 
 
 def from_ms(ms: int) -> str:
-    hour = ms/(1000*60*60) % 24
-    minute = ms/(1000*60) % 60
-    second = ms/(1000) % 60
+    hour = floor(ms/(1000*60*60) % 24)
+    minute = floor(ms/(1000*60) % 60)
+    second = floor(ms/(1000) % 60)
     return f'{hour:02.0f}:{minute:02.0f}:{second:02.0f}'
 
 def to_ms(hour, minute, second) -> int:
     return hour*1000*60*60 + minute*1000*60 + second*1000
 
-def get_events(report):
+def get_death_events(report):
     res = gql_client.execute(gql(Q_DEATHS.format(
         reportCode=report.code,
         startTime=report.fights[0].startTime,
@@ -184,16 +184,31 @@ def get_events(report):
     for event in res['reportData']['report']['events']['data']:
         print(str(Deaths(event, report)))
 
-
-
-def print_timestamps(report):
-    # pull 1 = 2:32 into vod
-    offset = to_ms(0, 2, 32) - report.fights[0].startTime
-
+def print_timestamps(report, timestr, ref_fight=0):
+    minutes, seconds = timestr.split(':')
+    offset = (int(minutes)*60 + int(seconds))*1000 - report.fights[ref_fight].startTime
+    print('00:00 Start')
     for fight in report.fights:
+        # print(from_ms(fight.startTime-report.fights[0].startTime))
         if fight.encounterID != 1065: continue
         print(f'{from_ms(fight.startTime + offset)} Pull {fight.i} Phase {fight.lastPhase}')
 
+    print(f'\nhttps://www.fflogs.com/reports/{report.code}')
+
+def print_twitch(report, url, timestr, ref_fight=0):
+    minutes, seconds = timestr.split(':')
+    offset = (int(minutes)*60 + int(seconds))*1000 - report.fights[ref_fight].startTime
+    for fight in report.fights:
+        # print(from_ms(fight.startTime-report.fights[0].startTime))
+        if fight.encounterID != 1065: continue
+        ms = fight.startTime + offset
+        minutes = floor(ms/(1000*60))
+        seconds = floor(ms/(1000) % 60)
+        print(f'{url}?t={minutes}m{seconds}s Pull {fight.i} Phase {fight.lastPhase} ')
+
 report = get_report(reportCode)
-print(report.bosses)
-get_events(report)
+# print_timestamps(report, '07:35')
+print_twitch(report, 'https://www.twitch.tv/videos/1530252131', '02:02')
+
+# print(report.bosses)
+# get_events(report)
