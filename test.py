@@ -62,6 +62,21 @@ query {{
 
 """
 
+Q_OVERKILL = """
+query {{
+    reportData {{
+        report(code: "{reportCode}") {{
+            events(dataType: DamageDone, filterExpression: "overkill > 0",
+                hostilityType: Friendlies, limit: 10000, startTime: {startTime}, endTime: {endTime}) {{
+                data
+                nextPageTimestamp
+            }}
+        }}
+    }}
+}}
+
+"""
+
 Q_ENCOUNTER= """
 query {{
     worldData {{
@@ -163,8 +178,6 @@ def get_report(code):
         fights=list(map(Fight, report['fights']))
     )
 
-
-
 def from_ms(ms: int) -> str:
     hour = floor(ms/(1000*60*60) % 24)
     minute = floor(ms/(1000*60) % 60)
@@ -206,9 +219,31 @@ def print_twitch(report, url, timestr, ref_fight=0):
         seconds = floor(ms/(1000) % 60)
         print(f'{url}?t={minutes}m{seconds}s Pull {fight.i} Phase {fight.lastPhase} ')
 
+def get_overkill(report):
+    res = gql_client.execute(gql(Q_OVERKILL.format(
+        reportCode=report.code,
+        startTime=report.fights[0].startTime,
+        endTime=report.fights[-1].endTime)))
+
+    data = res['reportData']['report']['events']['data']
+
+    for event in data:
+        # if event['targetID'] in report.bosses:
+        print(report.bosses[event['targetID']])
+        print(event)
+
 report = get_report(reportCode)
 # print_timestamps(report, '07:35')
-print_twitch(report, 'https://www.twitch.tv/videos/1530252131', '02:02')
+# print_twitch(report, 'https://www.twitch.tv/videos/1530252131', '02:02')
+
+get_overkill(report)
 
 # print(report.bosses)
 # get_events(report)
+
+# phase 1 start -> Ser Adelphel/Grinnaux gone -> Pure of heart damage?
+# phase 2 start -> King thordan overkill
+# phase 3 P2 end/Final Chorus damage -> Nidhogg overkill
+# phase 4 P3 end/soul of friendship buff -> Eyes overkill
+# Intermission P4 end -> spear of the fury overkill
+# phase 5
