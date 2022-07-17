@@ -18,23 +18,23 @@ def print_json(x):
 # reportCode = "PkaMGFgDf7hBWn2p" #mira clear pull 62
 # fightID = 62
 
-# reportCode = "tbXZ3WJf9czhQyD6" # long pull 38
-# fightID = 38
+reportCode = "tbXZ3WJf9czhQyD6" # long pull 38
+fightID = 38
 
-reportCode = "k127tNTpzycdnrVC"
+# reportCode = "k127tNTpzycdnrVC"
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
 
 
-# report.set_video_offset_time('03:19', 1) \
-#     .build_phase_model() \
-#     .print_phase_times(["P4"]) \
-#     .print_phase_times(["P5"])
-
-report.set_video_offset_time('00:21', 1) \
+report.set_video_offset_time('03:19', 1) \
     .build_phase_model() \
-    .print_phase_times_twitch(["P6"], '1533985744')
+    .print_phase_times(["P4"]) \
+    .print_phase_times(["P5"])
+
+# report.set_video_offset_time('00:21', 1) \
+#     .build_phase_model() \
+#     .print_phase_times_twitch(["P6"], '1533985744')
 
 
 # res = client.q("""

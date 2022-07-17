@@ -24,14 +24,6 @@ query Report ($reportCode: String!, $encounterID: Int) {
                 }
             }
             masterData {
-                bosses: actors(subType: "Boss") {
-                    id
-                    name
-                }
-                players: actors(type: "Player") {
-                    id
-                    name
-                }
                 actors {
                     id
                     gameID
@@ -59,17 +51,16 @@ query Report ($reportCode: String!, $encounterID: Int) {
 """
 
 Q_DEATHS = """
-query Deaths {{
-    reportData {{
-        report(code: "{reportCode}") {{
-            # filterExpression: "inCategory('deaths')=true"
-            events(dataType: Deaths, limit: 10000, startTime: {startTime}, endTime: {endTime}) {{
+query Deaths ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float) {
+    reportData {
+        report(code: $reportCode) {
+            events(dataType: Deaths, limit: 10000, startTime: $startTie}, endTime: $endTime) {{
                 data
                 nextPageTimestamp
-            }}
-        }}
-    }}
-}}
+            }
+        }
+    }
+}
 
 """
 

@@ -65,6 +65,15 @@ class Event:
             'fight': fight
             })
 
+def require_model(func):
+    '''Decorator that calls build on the model if needed before the function'''
+    def ensured(*args, **kwargs):
+        self = args[0]
+        if self.timelines is None:
+            self.build()
+        return func(*args, **kwargs)
+    return ensured
+
 class DSU_PHASE_MODEL:
     encounterID = Encounter.DSU
     _PHASE_NAMES = [
@@ -83,6 +92,7 @@ class DSU_PHASE_MODEL:
         self._report = report
         self._client = report._client
         self.code = report.code
+        self.timelines = None
 
     def build(self):
         """Required to start using the model"""
@@ -136,17 +146,17 @@ class DSU_PHASE_MODEL:
             timelines[fight.i] = timeline
         self.timelines = timelines
 
-    def phase_start(self, event: Event) -> Event:
-        """Returns the event that marks the start of the phase"""
-        timeline = self.timelines[event.fight]
-        passed_checkpoints = [e for e in timeline if e.time <= event.time]
-        return passed_checkpoints[-1]
-
     def phase(self, event: Event) -> int:
         """Returns the phase index of the event"""
         timeline = self.timelines[event.fight]
         passed_checkpoints = [e for e in timeline if e.time <= event.time]
         return len(passed_checkpoints) - 1
+
+    def phase_start(self, event: Event) -> Event:
+        """Returns the event that marks the start of the phase"""
+        timeline = self.timelines[event.fight]
+        passed_checkpoints = [e for e in timeline if e.time <= event.time]
+        return passed_checkpoints[-1]
 
     def phase_relative(self, event: Event) -> int:
         """Returns phase-relative time of event (in ms)"""
@@ -194,11 +204,8 @@ class Report:
             f.write(json.dumps(report['masterData']['abilities'], indent=4))
 
         # master data
-        # self.bosses = {actor['id']: actor['name'] for actor in report['masterData']['bosses']}
-        # self.players = {actor['id']: actor['name'] for actor in report['masterData']['players']}
-        # self.actors = {actor['id']: actor['name'] for actor in report['masterData']['actors']}
         self.actors = report['masterData']['actors']
-        self.actors_by_id = {actor['id']: actor for actor in self.actors}
+        # self.actors_by_id = {actor['id']: actor for actor in self.actors}
 
         self.abilities = {ability['gameID']: ability['name'] for ability in report['masterData']['abilities']}
 
@@ -217,7 +224,7 @@ class Report:
         self.offset = ms - fight.startTime
         return self
 
-    def set_output_type(self, output_type: Platform) -> Report:
+    def set_output_type(self, output_type: Platform, *args) -> Report:
         self.output_type = output_type
         return self
 
@@ -250,7 +257,7 @@ class Report:
                 'startTime': startTime, 
                 'endTime': fight.endTime})
             events = res['reportData']['report']['events']
-            total_data += events['data'] #[*map(lambda x: x['type'], events.get('data'))]
+            total_data += [*map(Event, events['data'])]
             startTime = events['nextPageTimestamp']
 
         with open('test.json', 'w') as f:
@@ -258,7 +265,8 @@ class Report:
 
     # outputs:
 
-    def print_pull_times(self, code=None) -> Report:
+    def print_pull_times(self, code: str=None) -> Report:
+        """Print start time for all fights"""
         for fight in report.fights:
             hour, minute, second = self._relative_time(fight.startTime)
             if code is None:
@@ -268,19 +276,7 @@ class Report:
                 print(f'https://www.twitch.tv/videos/{code}?t={minute}m{second}s Pull {fight.i} Phase {fight.lastPhase}')
         return self
 
-    def print_phase_times(self, phases: list) -> Report:
-        """Takes a list of phase names and outputs the start of those phases"""
-        phase_indexes = [self._phase_model.index_from_phase(p) for p in phases]
-
-        for phase_event in self._phase_model.get_all_phase_starts(phase_indexes):
-            phase_index = self._phase_model.phase(phase_event)
-            phase = self._phase_model.phase_from_index(phase_index)
-            hour, minute, second = self._relative_time(phase_event.time)
-
-            print(f'{hour:02.0f}:{minute:02.0f}:{second:02.0f} Pull {phase_event.fight} {phase}')
-        return self
-
-    def print_phase_times_twitch(self, phases: list, code: str) -> Report:
+    def print_phase_times(self, phases: list, code: str=None) -> Report:
         """Takes a list of phase names and outputs the start of those phases"""
         phase_indexes = [self._phase_model.index_from_phase(p) for p in phases]
 
