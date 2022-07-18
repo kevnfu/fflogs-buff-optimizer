@@ -1,11 +1,12 @@
-from enum import Enum
+from enum import Enum, auto
 
 class Encounter(Enum):
     DSU = 1065
 
 class Platform(Enum):
-    YOUTUBE = 0
-    TWITCH = 1
+    YOUTUBE = auto()
+    YOUTUBE_LINK = auto()
+    TWITCH = auto()
 
 # statics in FFlogs are guilds?
 class Guild(Enum):

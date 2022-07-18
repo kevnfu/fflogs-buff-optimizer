@@ -1,5 +1,5 @@
-Q_REPORT = """
-query Report ($reportCode: String!, $encounterID: Int) {
+Q_MASTER_DATA = """
+query MasterData ($reportCode: String!) {
     rateLimitData {
         limitPerHour
         pointsSpentThisHour
@@ -37,7 +37,20 @@ query Report ($reportCode: String!, $encounterID: Int) {
                     # type
                 }
             }
-            fights (encounterID: $encounterID) {
+        }
+    }
+}
+"""
+
+Q_FIGHTS = """
+query Fights ($reportCode: String!, $encounterID: Int, $fightIDs: [Int]) {
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            fights (encounterID: $encounterID, fightIDs: $fightIDs) {
                 id
                 encounterID
                 startTime
@@ -50,53 +63,46 @@ query Report ($reportCode: String!, $encounterID: Int) {
 }
 """
 
-Q_DEATHS = """
-query Deaths ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float) {
-    reportData {
-        report(code: $reportCode) {
-            events(dataType: Deaths, limit: 10000, startTime: $startTie}, endTime: $endTime) {{
-                data
-                nextPageTimestamp
-            }
-        }
-    }
-}
-
-"""
-
-Q_OVERKILL = """
-query {{
-    reportData {{
-        report(code: "{reportCode}") {{
-            events(dataType: DamageDone, filterExpression: "overkill > 0",
-                hostilityType: Friendlies, limit: 10000, 
-                startTime: {startTime}, endTime: {endTime}) {{
-                data
-                nextPageTimestamp
-            }}
-        }}
-    }}
-}}
-
-"""
-
-Q_DEATHS_OVERKILLS = """
-query DeathsAndOverkills ($reportCode: String!, $startTime: Float, $endTime: Float) {
+Q_EVENTS = """
+query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float, $filter: String) {
     rateLimitData {
         limitPerHour
         pointsSpentThisHour
     }
     reportData {
         report(code: $reportCode) {
-            deaths: events(dataType: Deaths, limit: 10000, startTime: $startTime, endTime: $endTime) {
+            events(limit: 10000, 
+                startTime: $startTime, endTime: $endTime,
+                encounterID: $encounterID,
+                filterExpression: $filter) {
                 data
                 nextPageTimestamp
             }
-            overkills: events(dataType: DamageDone, filterExpression: "overkill > 0",
-                hostilityType: Friendlies, limit: 10000, 
+        }
+    }
+}
+"""
+
+Q_TIMELINE = """
+query Timeline ($reportCode: String!, $encounterID: Int!, $startTime: Float, $endTime: Float){
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            deaths: events(dataType: Deaths, hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
                 startTime: $startTime, endTime: $endTime) {
                 data
-                nextPageTimestamp
+                # nextPageTimestamp
+            }
+            targetable: events(hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
+                filterExpression: "type='targetabilityupdate'",
+                startTime: $startTime, endTime: $endTime) {
+                data
+                # nextPageTimestamp
             }
         }
     }
@@ -113,54 +119,4 @@ query {{
         }}
     }}
 }}
-"""
-
-Q_EVENTS = """
-query Events ($reportCode: String!, $startTime: Float, $endTime: Float, $filter: String) {
-    reportData {
-        report(code: $reportCode) {
-            events(limit: 10000, 
-                startTime: $startTime, endTime: $endTime,
-                filterExpression: $filter) {
-                data
-                nextPageTimestamp
-            }
-        }
-    }
-}
-"""
-
-Q_P5_END = """
-query P5End ($reportCode: String!, $startTime: Float, $endTime: Float){
-    reportData {
-        report(code: $reportCode) {
-            events(dataType: Casts, filterExpression: "ability.id=25539"
-                hostilityType: Enemies, limit: 10000, 
-                startTime: $startTime, endTime: $endTime) {
-                data
-                nextPageTimestamp
-            }
-        }
-    }
-}
-"""
-
-Q_TIMELINE = """
-query Timeline ($reportCode: String!, $startTime: Float, $endTime: Float){
-    reportData {
-        report(code: $reportCode) {
-            deaths: events(dataType: Deaths, hostilityType: Enemies, limit: 10000, 
-                startTime: $startTime, endTime: $endTime) {
-                data
-                # nextPageTimestamp
-            }
-            targetable: events(hostilityType: Enemies, limit: 10000,
-                filterExpression: "type='targetabilityupdate'",
-                startTime: $startTime, endTime: $endTime) {
-                data
-                # nextPageTimestamp
-            }
-        }
-    }
-}
 """
