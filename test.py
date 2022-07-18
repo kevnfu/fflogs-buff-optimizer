@@ -26,27 +26,33 @@ def print_abilities(report):
     double_midare = report.actions("Kaeshi: Setsugekka")
     # [print(x) for x in double_midare]
     double_midare = double_midare.in_phases(["P4", "I", "P5"])
-    report.output_events(double_midare, 7000, ' ')
+    report.output_events(double_midare, -7000, ' ')
+
 
     p_balance = report.actions("Perfect Balance").in_phases(["P3", "P5"])
     print("Perfect Balance")
-    report.output_events(p_balance, 5000, ' ')
+    report.output_events(p_balance, -5000, ' ')
 
     # anna's POV
     report.set_video_offset_time('01:31', 1) \
         .set_output_type(Platform.TWITCH, '1533795273')
 
     print("double_midare")
-    report.output_events(double_midare, 7000)
+    report.output_events(double_midare, -7000)
 
     deaths = report.deaths().to("Mayu Sakuma").in_phases(["P3"])
     print("deaths")
-    report.output_events(deaths, 10000)
+    report.output_events(deaths, -10000)
+
+    print("wrath")
+    wrath = report.actions("Wrath of the Heavens")
+    report.output_events(wrath, -3700)
 
 reportCode = "tbXZ3WJf9czhQyD6" # long pull 38
 fightID = 38
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
-
 print_abilities(report)
+
+

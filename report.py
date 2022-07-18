@@ -3,7 +3,6 @@ from typing import List, Dict, Tuple, Iterator, Any
 
 # standard
 import json
-from operator import itemgetter
 from dataclasses import dataclass
 from math import floor
 
@@ -149,7 +148,19 @@ class Report(EventProducer, PhaseModelUser):
         # startTime and endTime are relative to the report, not unix time
         self.start_time = self.fights[0].start_time
         self.end_time = self.fights[-1].end_time
-        
+
+    # get child elements
+    def get_fight(self, fightID: int) -> Fight:
+        return next(filter(lambda x: x.i==fightID, self.fights))
+
+    def get_actor(self, name: str) -> List[Actor]:
+        return next(filter(lambda a: a.name == name, self.actors))
+
+    def get_actor_ids(self, name: str) -> List[int]:
+        return [a.i for a in self.actors if a.name == name]
+
+    def get_ability(self, name) -> Ability:
+        return next(filter(lambda a: a.name == name, self.abilities))
 
     def set_video_offset_time(self, mmss: str, fightID: int) -> Report:
         """Put in timestamp of video at Fight fightID"""
@@ -167,21 +178,6 @@ class Report(EventProducer, PhaseModelUser):
         minute = floor(ms/(1000*60) % 60)
         second = floor(ms/(1000) % 60)
         return hour, minute, second
-
-    # get child elements
-    def get_fight(self, fightID: int) -> Fight:
-        return next(filter(lambda x: x.i==fightID, self.fights))
-
-    def get_actor(self, name: str) -> List[Actor]:
-        return next(filter(lambda a: a.name == name, self.actors))
-
-    def get_actor_ids(self, name: str) -> List[int]:
-        return [a.i for a in self.actors if a.name == name]
-
-    def get_ability(self, name) -> Ability:
-        return next(filter(lambda a: a.name == name, self.abilities))
-
-    
     # outputs:
     @staticmethod
     def _youtube_time(time: int) -> str:
@@ -201,7 +197,8 @@ class Report(EventProducer, PhaseModelUser):
         return self
 
     def _to_output(self, time: int) -> str:
-        assert self.output_type is not None
+        assert self.output_type is not None, 'No output_type selected.'
+
         match self.output_type:
             case Platform.YOUTUBE:
                 return self._youtube_time(time)
@@ -215,7 +212,7 @@ class Report(EventProducer, PhaseModelUser):
         ls = list()
         for e in events:
             phase = self.phase_name(e)
-            time = self._relative_time(e.time - offset)
+            time = self._relative_time(e.time + offset)
             phase_time = self.phase_time(e) / 1000
             ls.append(f'{self._to_output(time)} {e.fight}{phase}@{phase_time:.0f}s')
         print(separator.join(ls))
@@ -229,9 +226,9 @@ class Report(EventProducer, PhaseModelUser):
             print(output)
         return self
 
-    def print_phase_times(self, phases: List[str]) -> Report:
+    def print_phase_times(self, phases: List[str], offset=0) -> Report:
         """Takes a list of phase names and outputs the start of those phases"""
-        for phase_event in self.get_phase_starts(phases):
+        for phase_event in self.phase_starts(phases):
             phase = self.phase_name(phase_event)
             time = self._relative_time(phase_event.time)
             fightID = phase_event.fight

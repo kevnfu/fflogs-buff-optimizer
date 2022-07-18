@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import List, Dict, Tuple, Iterator, Any
 
 import itertools 
+import json
 
 from enums import Encounter
 from queries import Q_TIMELINE
@@ -32,23 +33,28 @@ class PhaseModelUser:
     def phase_time(self, event: Event) -> int:
         return self._model.phase_time(event)
 
-    def get_phase_starts(self, phases: List[str]) -> List[Event]:
+    def phase_starts(self, phases: List[str]) -> List[Event]:
         """Returns a list of events corresponding to the start of phase_index phases"""
-        return self._model.get_phase_starts(phases)
+        return self._model.phase_starts(phases)
 
 class PhaseModel:
+    """Builds a timeline of events based on a list of fights"""
     # override
-    _PHASE_NAMES = None
-    EVENT_INDEX = None
     ENCOUNTER = None
 
     def build(self):
         pass
 
     def __init__(self, code: str, client: FFClient, fights: List[Fight]) -> None:
+        # override
+        self._PHASE_NAMES = None
+        self._EVENT_INDEX = None
+
         self.code = code
         self._client = client
         self.fights = fights
+
+        # populated by build()
         self.timelines = None
 
     def _fetch_timeline_events(self) -> Dict[str, Any]:
@@ -82,7 +88,7 @@ class PhaseModel:
         return event.time - self.phase_start(event).time
 
     @require_model
-    def get_phase_starts(self, phases: List[str]) -> List[Event]:
+    def phase_starts(self, phases: List[str]) -> List[Event]:
         """Returns a list of events corresponding to the start of phase_index phases"""
         phase_indexes = [self.index_from_phase(p) for p in phases]
         phase_events = list()
@@ -94,38 +100,36 @@ class PhaseModel:
     def get_fight_timeline(self, fight_id: int) -> List[Event]:
         return self.timelines[fight_id]
 
-    @classmethod
-    def phase_from_index(cls, index: int) -> str:
-        return [x[1] for x in cls._PHASE_NAMES if index in x][0]
+    def phase_from_index(self, index: int) -> str:
+        return [x[1] for x in self._PHASE_NAMES if index in x][0]
 
-    @classmethod
-    def index_from_phase(cls, phase: str) -> int:
-        return [x[0] for x in cls._PHASE_NAMES if phase in x][0]
+    def index_from_phase(self, phase: str) -> int:
+        return [x[0] for x in self._PHASE_NAMES if phase in x][0]
 
 
 class PhaseModelDsu(PhaseModel):
-    _PHASE_NAMES = [
-        (0, "P1"),
-        (1, "P2"),
-        (2, "P3"),
-        (3, "P4"),
-        (4, "I"),
-        (5, "P5"),
-        (6, "P6"),
-        (7, "P7"),]
-
-    EVENT_INDEX = [
-        2, # Thordan Death
-        4, # Nidhogg Death
-        8, # Both eyes dead
-        12, # Thordan targetable
-        16, # Dragons targetable
-        26,] # Dragon-King thordan targetable
-    
     ENCOUNTER = Encounter.DSU
 
     def build(self):
-        """Required to start using the model"""
+        """Creates a list of events relevant to the timeline"""
+        self._PHASE_NAMES = [
+            (0, "P1"),
+            (1, "P2"),
+            (2, "P3"),
+            (3, "P4"),
+            (4, "I"),
+            (5, "P5"),
+            (6, "P6"),
+            (7, "P7"),]
+
+        self._EVENT_INDEX = [
+            2, # Thordan Death
+            4, # Nidhogg Death
+            8, # Both eyes dead
+            12, # Thordan targetable
+            16, # Dragons targetable
+            26,] # Dragon-King thordan targetable
+
         res = self._fetch_timeline_events()
         report = res['reportData']['report']
 
@@ -159,7 +163,13 @@ class PhaseModelDsu(PhaseModel):
                 # Assume started P2
                 # p1 start in the undefined past, p2 start == fight start
                 timeline = [Event.from_time(-1, fight.i), Event.from_time(fight.start_time, fight.i)]
-                timeline += [events[i] for i in self.EVENT_INDEX if i < len(events)]
+                timeline += [events[i] for i in self._EVENT_INDEX if i < len(events)]
             
             timelines[fight.i] = timeline
         self.timelines = timelines
+
+        with open('timelines.json', 'w') as f:
+            for i, timeline in timelines.items():
+                f.write(f'fight{i}')
+                for e in timeline:
+                    f.write(str(e))
