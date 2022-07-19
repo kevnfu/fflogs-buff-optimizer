@@ -64,7 +64,7 @@ query Fights ($reportCode: String!, $encounterID: Int, $fightIDs: [Int]) {
 """
 
 Q_EVENTS = """
-query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float, $filter: String) {
+query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float, $filter: String, $fightIDs: [Int]) {
     rateLimitData {
         limitPerHour
         pointsSpentThisHour
@@ -74,7 +74,8 @@ query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTi
             events(limit: 10000, 
                 startTime: $startTime, endTime: $endTime,
                 encounterID: $encounterID,
-                filterExpression: $filter) {
+                filterExpression: $filter,
+                fightIDs: $fightIDs) {
                 data
                 nextPageTimestamp
             }

@@ -7,6 +7,7 @@ import json
 from enums import Encounter
 from queries import Q_TIMELINE
 from events import Event
+from report import Report
 
 def require_model(func):
     '''Decorator that calls build on the model if needed before the function'''
@@ -17,42 +18,19 @@ def require_model(func):
         return func(*args, **kwargs)
     return ensured
 
-class PhaseModelUser:
-    def __init__(self, model: PhaseModel):
-        self._model = model
-
-    # phase model methods
-    def phase(self, event: Event) -> int:
-        """Returns the phase index of the event"""
-        return self._model.phase(event)
-
-    def phase_name(self, event: Event) -> str:
-        """Returns the phase name of the event"""
-        return self._model.phase_name(event)
-
-    def phase_time(self, event: Event) -> int:
-        return self._model.phase_time(event)
-
-    def phase_starts(self, phases: List[str]) -> List[Event]:
-        """Returns a list of events corresponding to the start of phase_index phases"""
-        return self._model.phase_starts(phases)
-
-class PhaseModel:
+class PhaseReport(Report):
     """Builds a timeline of events based on a list of fights"""
+
     # override
-    ENCOUNTER = None
+    def build():
+        raise NotImplementedError('Use subclass of PhaseReport')
 
-    def build(self):
-        pass
+    def __init__(self, code: str, client: FFClient, encounter: Encounter) -> None:
+        super().__init__(code, client, encounter)
 
-    def __init__(self, code: str, client: FFClient, fights: List[Fight]) -> None:
         # override
         self._PHASE_NAMES = None
         self._EVENT_INDEX = None
-
-        self.code = code
-        self._client = client
-        self.fights = fights
 
         # populated by build()
         self.timelines = None
@@ -61,7 +39,7 @@ class PhaseModel:
         """Returns response from server containing timeline events"""
         res = self._client.q(Q_TIMELINE, {
             'reportCode': self.code, 
-            'encounterID': self.ENCOUNTER.value,
+            'encounterID': self.encounter.value,
             'startTime': self.fights[0].start_time, 
             'endTime': self.fights[-1].end_time})
         return res
@@ -106,9 +84,42 @@ class PhaseModel:
     def index_from_phase(self, phase: str) -> int:
         return [x[0] for x in self._PHASE_NAMES if phase in x][0]
 
+    def output_events(self, events: List[Event], offset: int=0, separator: str='\n') -> None:
+        ls = list()
+        for e in events:
+            phase = self.phase_name(e)
+            time = self._relative_time(e.time + offset)
+            phase_time = self.phase_time(e) / 1000
+            ls.append(f'{self._to_output(time)} {e.fight}{phase}@{phase_time:.0f}s')
+        print(separator.join(ls))
 
-class PhaseModelDsu(PhaseModel):
-    ENCOUNTER = Encounter.DSU
+    def print_pull_times(self) -> Report:
+        """Print start time for all fights"""
+        for fight in self.fights:
+            time = self._relative_time(fight.startTime)
+            phase = self._phase_model.phase_from_index(fight.lastPhase)
+            output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
+            print(output)
+        return self
+
+    def print_phase_times(self, phases: List[str], offset=0) -> Report:
+        """Takes a list of phase names and outputs the start of those phases"""
+        for phase_event in self.phase_starts(phases):
+            phase = self.phase_name(phase_event)
+            time = self._relative_time(phase_event.time)
+            fightID = phase_event.fight
+
+            output = f'{self._to_output(time)} '
+            output += f'Fight{fightID}:{100 - self.fights_by_id[fightID].percent:.2f}%:{phase}'
+            print(output)
+        return self
+
+class ReportDsu(PhaseReport):
+    def __init__(self, code: str, client: FFClient, encounter: Encounter):
+        super().__init__(code, client, encounter)
+
+        if encounter is not Encounter.DSU:
+            raise TypeError(f'Using DSU model for {encounter}')
 
     def build(self):
         """Creates a list of events relevant to the timeline"""

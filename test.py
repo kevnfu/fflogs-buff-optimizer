@@ -5,7 +5,7 @@ import json
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
 from enums import Encounter, Platform
-from report import Report
+from phases import ReportDsu
 
 def print_json(x):
     print(json.dumps(x, indent=4))
@@ -40,10 +40,6 @@ def print_abilities(report):
     print("double_midare")
     report.output_events(double_midare, -7000)
 
-    deaths = report.deaths().to("Mayu Sakuma").in_phases(["P3"])
-    print("deaths")
-    report.output_events(deaths, -10000)
-
     print("wrath")
     wrath = report.actions("Wrath of the Heavens")
     report.output_events(wrath, -3700)
@@ -52,7 +48,7 @@ reportCode = "tbXZ3WJf9czhQyD6" # long pull 38
 fightID = 38
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
-report = Report(reportCode, client, Encounter.DSU)
+report = ReportDsu(reportCode, client, Encounter.DSU)
 print_abilities(report)
 
 

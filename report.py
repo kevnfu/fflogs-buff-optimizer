@@ -9,7 +9,6 @@ from math import floor
 # custom
 from enums import Encounter, Platform
 from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS
-from phasemodel import PhaseModelDsu, PhaseModelUser
 from events import Event, EventList
 
 @dataclass
@@ -36,47 +35,7 @@ class Ability:
         self.i = data['gameID']
         self.name = data['name']
 
-class EventProducer:
-    """Contains methods for specific queries in the context of a start and end time"""
-    def __init__(self, client: FFClient, code: str, encounter: int, startTime: int, endTime: int):
-        self._client = client
-        self.encounter = encounter
-        self.start_time = startTime
-        self.end_time = endTime
-        self.code = code
-
-    def fetch_events(self, filter_expression: str='') -> EventList:
-        start_time = self.start_time
-        all_events = []
-        while start_time:
-            res = self._client.q(Q_EVENTS, params={
-                'reportCode': self.code,
-                'encounterID': self.encounter.value,
-                'startTime': start_time, 
-                'endTime': self.end_time,
-                'filter': filter_expression})
-            events = res['reportData']['report']['events']
-            all_events += [*map(Event, events['data'])]
-            start_time = events['nextPageTimestamp']
-
-        with open('test.json', 'w') as f:
-            for e in all_events:
-                f.write(str(e) + '\n')
-
-        return EventList(all_events, self)
-
-    def deaths(self) -> EventList:
-        return self.fetch_events("inCategory('deaths') = true")
-
-    def actions(self, ability_name: str, actor_name: str='') -> EventList:
-        filter_str = f"type='cast' AND ability.name='{ability_name}'"
-        if actor_name:
-            filter_str += f" AND source.name='{actor_name}'"
-        return self.fetch_events(filter_str)
-
-    def dummy_downs(self) -> EventList:
-        return self.fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
-
+    
 class Fight:
     i: int
     encounter: int
@@ -95,24 +54,18 @@ class Fight:
         self.lastPhase=data['lastPhaseAsAbsoluteIndex']
         self.report=report
 
-class Report(EventProducer, PhaseModelUser):
+class Report:
     """Report for one type of encounter"""
     def __init__(self, code: str, client: 'FFClient', encounter: Encounter) -> None:
         self._client = client
         self.code = code
         self.encounter = encounter
         self.data = dict() # to be filled w/ individual calls
-        
-        self.fetch_master_data()
-        EventProducer.__init__(self, client, code, encounter, self.r_start_time, self.r_end_time)
-        
-        self.fetch_fights()
 
-        phase_model = PhaseModelDsu(code, client, self.fights)
-        assert encounter is phase_model.ENCOUNTER
-        PhaseModelUser.__init__(self, phase_model)
+        self._fetch_master_data() # self.r_start_time, r_end_time
+        self._fetch_fights() # self.fights, start_time, end_time
 
-    def fetch_master_data(self) -> None:
+    def _fetch_master_data(self) -> None:
         res = self._client.q(Q_MASTER_DATA, {
             'reportCode': self.code})
         report = res['reportData']['report']
@@ -136,7 +89,7 @@ class Report(EventProducer, PhaseModelUser):
         # self.abilities_by_id = {a.i: a for a in self.abilities}
         # self.abilities_by_name = {a.name: a for a in self.abilities}
 
-    def fetch_fights(self) -> None:
+    def _fetch_fights(self) -> None:
         res = self._client.q(Q_FIGHTS, {
             'reportCode': self.code,
             'encounterID': self.encounter.value})
@@ -162,6 +115,40 @@ class Report(EventProducer, PhaseModelUser):
     def get_ability(self, name) -> Ability:
         return next(filter(lambda a: a.name == name, self.abilities))
 
+    def _fetch_events(self, filter_expression: str='', fight_ids: List[Int]=[]) -> EventList:
+        start_time = self.start_time
+        all_events = []
+        while start_time:
+            res = self._client.q(Q_EVENTS, params={
+                'reportCode': self.code,
+                'encounterID': self.encounter.value,
+                'startTime': start_time, 
+                'endTime': self.end_time,
+                'filter': filter_expression,
+                'fightIDs': fight_ids})
+            events = res['reportData']['report']['events']
+            all_events += [*map(Event, events['data'])]
+            start_time = events['nextPageTimestamp']
+
+        with open('test.json', 'w') as f:
+            for e in all_events:
+                f.write(str(e) + '\n')
+
+        return EventList(all_events, self)
+
+    def deaths(self) -> EventList:
+        return self._fetch_events("inCategory('deaths') = true")
+
+    def actions(self, ability_name: str, actor_name: str='') -> EventList:
+        filter_str = f"type='cast' AND ability.name='{ability_name}'"
+        if actor_name:
+            filter_str += f" AND source.name='{actor_name}'"
+        return self._fetch_events(filter_str)
+
+    def dummy_downs(self) -> EventList:
+        return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
+
+    # outputs:
     def set_video_offset_time(self, mmss: str, fightID: int) -> Report:
         """Put in timestamp of video at Fight fightID"""
         minutes, seconds = mmss.split(':')
@@ -178,7 +165,7 @@ class Report(EventProducer, PhaseModelUser):
         minute = floor(ms/(1000*60) % 60)
         second = floor(ms/(1000) % 60)
         return hour, minute, second
-    # outputs:
+
     @staticmethod
     def _youtube_time(time: int) -> str:
         hour, minute, second = time
@@ -189,7 +176,6 @@ class Report(EventProducer, PhaseModelUser):
         hour, minute, second = time
         minute += hour * 60
         return f'https://www.twitch.tv/videos/{code}?t={minute}m{second}s'
-
 
     def set_output_type(self, output_type: Platform, code: str=None) -> Report:
         self.output_type = output_type
@@ -208,32 +194,3 @@ class Report(EventProducer, PhaseModelUser):
             case _:
                 raise ValueError('Not a supported platform')
 
-    def output_events(self, events: List[Event], offset: int=0, separator: str='\n') -> None:
-        ls = list()
-        for e in events:
-            phase = self.phase_name(e)
-            time = self._relative_time(e.time + offset)
-            phase_time = self.phase_time(e) / 1000
-            ls.append(f'{self._to_output(time)} {e.fight}{phase}@{phase_time:.0f}s')
-        print(separator.join(ls))
-
-    def print_pull_times(self) -> Report:
-        """Print start time for all fights"""
-        for fight in self.fights:
-            time = self._relative_time(fight.startTime)
-            phase = self._phase_model.phase_from_index(fight.lastPhase)
-            output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
-            print(output)
-        return self
-
-    def print_phase_times(self, phases: List[str], offset=0) -> Report:
-        """Takes a list of phase names and outputs the start of those phases"""
-        for phase_event in self.phase_starts(phases):
-            phase = self.phase_name(phase_event)
-            time = self._relative_time(phase_event.time)
-            fightID = phase_event.fight
-
-            output = f'{self._to_output(time)} '
-            output += f'Fight{fightID}:{100 - self.fights_by_id[fightID].percent:.2f}%:{phase}'
-            print(output)
-        return self

@@ -36,8 +36,7 @@ class Event:
             'type': 'time',
             'sourceID': -1,
             'targetID': -1,
-            'fight': fight
-            })
+            'fight': fight})
 
 
 class EventList:
