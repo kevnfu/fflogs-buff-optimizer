@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Dict, Tuple, Iterator, Any
+from typing import Any
 
 import itertools 
 import json
@@ -54,7 +54,7 @@ class PhaseModel:
     The first event is the start of the first phase, the second event is the start of the second, etc.
     """
 
-    def build(self, fight_id: int) -> List[Event]:
+    def build(self, fight_id: int) -> list[Event]:
         """Creates timeline for one fight"""
         raise NotImplementedError('Use subclass of PhaseReport')
 
@@ -62,23 +62,16 @@ class PhaseModel:
         self.code = code
         self._report = report
         self.encounter = report.encounter
-        self._client = client
+        self._client = report._client
 
         # override
         self.PHASE_NAMES = None
 
-        # Dict[fight_id: timeline], populated by build()
+        # dict[fight_id: timeline], populated by build()
         self.timelines = dict() 
 
-    def _fetch_fight(self, fight_id: int) -> Fight:
-        """Fetch one fight from the report"""
-        res = self._client.q(Q_FIGHTS, {
-            'reportCode': self.code,
-            'encounterID': self.encounter.value,
-            'fightIDs': [fight_id]})
-        return Fight(res['reportData']['report']['fights'][0])
 
-    def _fetch_timeline_events(self, fight: Fight) -> Dict[str, Any]:
+    def _fetch_timeline_events(self, fight: Fight) -> dict[str, Any]:
         """Returns response from server containing timeline events"""
         res = self._client.q(Q_TIMELINE, {
             'reportCode': self.code,
@@ -108,7 +101,7 @@ class PhaseModel:
         """Returns phase-relative time of event (in ms)"""
         return event.time - self.phase_start(event).time
 
-    def phase_starts(self, phases: List[str]) -> List[Event]:
+    def phase_starts(self, phases: list[str]) -> list[Event]:
         """Returns a list of events corresponding to the start of phase_index phases"""
         phase_indexes = [self._to_phase_index(p) for p in phases]
         phase_events = list()
@@ -135,7 +128,7 @@ class PhaseModelDsu(PhaseModel):
 
         self.PHASE_NAMES = ["P1", "P2", "P3", "P4", "I", "P5", "P6", "P7"]
 
-    def build(self, fight_id: int) -> List[Event]:
+    def build(self, fight_id: int) -> list[Event]:
         EVENT_INDEX = [
             2, # Thordan Death
             4, # Nidhogg Death
@@ -144,7 +137,7 @@ class PhaseModelDsu(PhaseModel):
             16, # Dragons targetable
             26,] # Dragon-King thordan targetable
 
-        fight = self._fetch_fight(fight_id)
+        fight = self.report.get_fight(fight_id)
 
         # special case fight ended phase 1; timeline is a single event: fight start
         if fight.last_phase == 0: # Fight ended phase 1

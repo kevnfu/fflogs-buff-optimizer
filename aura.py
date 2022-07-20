@@ -1,7 +1,10 @@
 from __future__ import annotations
-from typing import List, Dict, Tuple, Iterator, Any
+from typing import Any
+
+import json
 
 from enums import Encounter
+from data import Event
 
 Q_AURAS = """
 query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $filter: String, $fightIDs: [Int]) {
@@ -11,16 +14,15 @@ query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $filter: 
     }
     reportData {
         report(code: $reportCode) {
-            buffs: events(limit: 10000, dataType="Buffs"
+            buffs: events(limit: 10000, dataType: Buffs
                 startTime: $startTime, endTime: $endTime,
                 filterExpression: $filter,
                 fightIDs: $fightIDs) {
                 data
                 nextPageTimestamp
             }
-            debuffs: events(limit: 10000, dataType="Debuffs"
+            debuffs: events(limit: 10000, dataType: Debuffs
                 startTime: $startTime, endTime: $endTime,
-                encounterID: $encounterID,
                 filterExpression: $filter,
                 fightIDs: $fightIDs) {
                 data
@@ -38,24 +40,18 @@ class AuraModel:
         self._report = report
         self._client = client
 
-    def _fetch_fight(self, fight_id: int) -> Fight:
-        """Fetch one fight from the report"""
-        res = self._client.q(Q_FIGHTS, {
-            'reportCode': self.code,
-            'encounterID': self.encounter.value,
-            'fightIDs': [fight_id]})
-        return Fight(res['reportData']['report']['fights'][0])
-
     def test(self):
+        fight = self._report.get_fight(1)
+
         res = self._client.q(Q_AURAS, {
             'reportCode': self.code,
-            'startTime': start_time,
-            'endTime': end_time,})
+            'startTime': fight.start_time,
+            'endTime': fight.end_time,})
         report = res['reportData']['report']
-        buffs = [Event(e) for e in report['buffs']]
-        debuffs = [Event(e) for e in report['debuffs']]
+        buffs = [Event(e) for e in report['buffs']['data']]
+        debuffs = [Event(e) for e in report['debuffs']['data']]
 
-        with open('test.json') as f:
+        with open('test.json', 'w') as f:
             for buff in buffs:
                 f.write(str(buff) + '\n')
 

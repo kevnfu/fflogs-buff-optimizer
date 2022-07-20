@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Dict, Tuple, Iterator, Any
+from typing import Any
 
 # standard
 import json
@@ -39,8 +39,8 @@ class Report:
 
         self.data = dict() # to be filled w/ individual calls
 
-        self._fetch_master_data() # self.r_start_time, r_end_time
-        self._fetch_fights() # self.fights, start_time, end_time
+        self._fetch_master_data()
+        self._fights = self._fetch_all_fights() # {fight id: fight}
 
     def _fetch_master_data(self) -> None:
         res = self._client.q(Q_MASTER_DATA, {
@@ -49,8 +49,8 @@ class Report:
         self.title = report['title']
         self.owner = report['owner']
         self.guild = report['guild']
-        self.r_start_time = report['startTime']
-        self.r_end_time = report['endTime']
+        self.start_time = report['startTime']
+        self.end_time = report['endTime']
 
         with open('master.json', 'w') as f:
             f.write(json.dumps(res, indent=4))
@@ -66,42 +66,58 @@ class Report:
         self.abilities_by_id = {a.i: a for a in self.abilities}
         # self.abilities_by_name = {a.name: a for a in self.abilities}
 
-    def _fetch_fights(self) -> None:
+    def _fetch_all_fights(self) -> list(Fight):
         res = self._client.q(Q_FIGHTS, {
             'reportCode': self.code,
             'encounterID': self.encounter.value})
         report = res['reportData']['report']
+        return {f['id']: Fight(f) for f in report['fights']}
+        # self._fights_by_id = {f.i: f for f in self._fights}
 
-        # fight data
-        self.fights = [Fight(data) for data in report['fights']]
-        self.fights_by_id = {f.i: f for f in self.fights}
-        # startTime and endTime are relative to the report, not unix time
-        self.start_time = self.fights[0].start_time
-        self.end_time = self.fights[-1].end_time
+    def _fetch_fight(self, fight_id: int) -> Fight:
+        """Tries to obtain fight from the server"""
+        res = self._client.q(Q_FIGHTS, {
+            'reportCode': self.code,
+            'encounterID': self.encounter.value,
+            'fightIDs': [fight_id]})
+        fight_list = res['reportData']['report']['fights']
+        if fight_list: # if is not empty
+            new_fight = Fight(fight_list[0])
+            self._fights[new_fight.i] = new_fight
+            return new_fight
+        else:
+            return None
 
     # get child elements
-    def get_fight(self, fightID: int) -> Fight:
-        return next(filter(lambda x: x.i==fightID, self.fights))
+    def get_fight(self, fight_id: int) -> Fight:
+        """Returns fight from self._fights, or tries to get from server"""
+        return self._fights.setdefault(fight_id, self._fetch_fight(fight_id))
 
-    def get_actor(self, name: str) -> List[Actor]:
+    def first_fight(self) -> Fight:
+        return self._fights[min(self._fights.keys())]
+
+    def last_fight(self) -> fights:
+        return self._fights[max(self._fights.keys())]
+
+    def get_actor(self, name: str) -> list[Actor]:
         return [a for a in self.actors if a.name==name]
 
-    def get_actor_ids(self, name: str) -> List[int]:
+    def get_actor_ids(self, name: str) -> list[int]:
         return [a.i for a in self.actors if a.name == name]
 
     def get_ability(self, name) -> Ability:
-        return next(filter(lambda a: a.name == name, self.abilities))
+        return next(filter(lambda a: a.name==name, self.abilities))
 
     @require_phase_model # EventList can access phase events
-    def _fetch_events(self, filter_expression: str='', fight_ids: List[Int]=[]) -> EventList:
-        start_time = self.start_time
+    def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
+        start_time = self.first_fight().start_time
         all_events = []
         while start_time:
             res = self._client.q(Q_EVENTS, params={
                 'reportCode': self.code,
                 'encounterID': self.encounter.value,
                 'startTime': start_time, 
-                'endTime': self.end_time,
+                'endTime': self.last_fight().end_time,
                 'filter': filter_expression,
                 'fightIDs': fight_ids})
             events = res['reportData']['report']['events']
@@ -135,7 +151,7 @@ class Report:
         pass
 
     @require_phase_model
-    def output_events(self, events: List[Event], offset: int=0, separator: str='\n') -> None:
+    def output_events(self, events: list[Event], offset: int=0, separator: str='\n') -> None:
         ls = list()
         for event in events:
             phase = self.pm.phase_name(event)
@@ -147,7 +163,7 @@ class Report:
     @require_phase_model
     def print_pull_times(self) -> Report:
         """Print start time for all fights"""
-        for fight in self.fights:
+        for fight in self._fights.values():
             time = self._relative_time(fight.start_time)
             phase = self.pm._to_phase_name(fight.last_phase)
             output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
@@ -155,7 +171,7 @@ class Report:
         return self
 
     @require_phase_model
-    def print_phase_times(self, phases: List[str], offset=0) -> Report:
+    def print_phase_times(self, phases: list[str], offset=0) -> Report:
         """Takes a list of phase names and outputs the start of those phases"""
         for phase_event in self.phase_starts(phases):
             phase = self.pm.phase_name(phase_event)
@@ -163,7 +179,7 @@ class Report:
             fightID = phase_event.fight
 
             output = f'{self._to_output(time)} '
-            output += f'Fight{fightID}:{100 - self.fights_by_id[fightID].percent:.2f}%:{phase}'
+            output += f'Fight{fightID}:{100 - self.get_fight(fightID).percent:.2f}%:{phase}'
             print(output)
         return self
 
@@ -177,7 +193,7 @@ class Report:
         self.offset = ms - fight.start_time
         return self
 
-    def _relative_time(self, time: int) -> Tuple(int, int, int):
+    def _relative_time(self, time: int) -> tuple(int, int, int):
         """Takes event time and outputs video time"""
         ms = time + self.offset
         hour = floor(ms/(1000*60*60) % 24)

@@ -35,7 +35,7 @@ def print_a(report):
 reportCode = "TwzV7fmdhpA1gykF"
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
-# report = Report(reportCode, client, Encounter.DSU)
+report = Report(reportCode, client, Encounter.DSU)
 # print_a(report)
 
 # report.set_video_offset_time('1:06', 1)\
@@ -45,7 +45,7 @@ client = FFClient(CLIENT_ID, CLIENT_SECRET)
 #     report.print_pull_times()
 #     report.actions("Ancient Quaga").in_phase("P2").named().write(f).print()
 
-am = AuraModel('19M43vwFh6GtAcCp', client, None)
+am = AuraModel('19M43vwFh6GtAcCp', client, report)
 am.test()
 
 # Q_TABLE = """
