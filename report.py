@@ -9,50 +9,25 @@ from math import floor
 # custom
 from enums import Encounter, Platform
 from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS
-from events import Event, EventList
+from data import Event, EventList, Fight, Ability, Actor
+from phases import PhaseModelDsu
 
-@dataclass
-class Actor:
-    i: int
-    name: str
-    gameID: int
-    type_: str
-    subtype: str
+def require_phase_model(func):
+    '''Decorator that sets the phase model if needed before the function'''
+    def ensured(*args, **kwargs):
+        self = args[0]
+        if self.pm is None:
+            match self.encounter:
+                case Encounter.DSU: 
+                    model = PhaseModelDsu
+                case Encounter.TEA:
+                    model = PhaseModelTea
+                case _:
+                    raise NotImplementedError(f'No phase model for {self.encounter}')
 
-    def __init__(self, data: Dict[str: Any]) -> None:
-        self.i = data['id']
-        self.name = data['name']
-        self.gameID = data['gameID']
-        self.type_ = data['type']
-        self.subtype = data['subType']
-
-@dataclass
-class Ability:
-    i: int
-    name: str
-
-    def __init__(self, data: Dict[str: Any]) -> None:
-        self.i = data['gameID']
-        self.name = data['name']
-
-    
-class Fight:
-    i: int
-    encounter: int
-    start_time: int
-    end_time: int
-    percent: float
-    lastPhase: int
-    report: Report
-
-    def __init__(self, data: Dict[str, Any], report: Report) -> None:
-        self.i=data['id']
-        self.encounter=data['encounterID']
-        self.start_time=data['startTime']
-        self.end_time=data['endTime']
-        self.percent=data['fightPercentage']
-        self.lastPhase=data['lastPhaseAsAbsoluteIndex']
-        self.report=report
+        self.pm = model(self.code, self._client, self)
+        return func(*args, **kwargs)
+    return ensured
 
 class Report:
     """Report for one type of encounter"""
@@ -60,6 +35,8 @@ class Report:
         self._client = client
         self.code = code
         self.encounter = encounter
+        self.pm = None # only loaded when needed
+
         self.data = dict() # to be filled w/ individual calls
 
         self._fetch_master_data() # self.r_start_time, r_end_time
@@ -83,10 +60,10 @@ class Report:
             f.write(json.dumps(report['masterData']['abilities'], indent=4))
 
         self.actors = [Actor(a) for a in report['masterData']['actors']]
-        # self.actors_by_id = {a.i: a for a in self.actors}
+        self.actors_by_id = {a.i: a for a in self.actors}
 
         self.abilities = [Ability(a) for a in report['masterData']['abilities']]
-        # self.abilities_by_id = {a.i: a for a in self.abilities}
+        self.abilities_by_id = {a.i: a for a in self.abilities}
         # self.abilities_by_name = {a.name: a for a in self.abilities}
 
     def _fetch_fights(self) -> None:
@@ -96,7 +73,7 @@ class Report:
         report = res['reportData']['report']
 
         # fight data
-        self.fights = [Fight(data, self) for data in report['fights']]
+        self.fights = [Fight(data) for data in report['fights']]
         self.fights_by_id = {f.i: f for f in self.fights}
         # startTime and endTime are relative to the report, not unix time
         self.start_time = self.fights[0].start_time
@@ -107,7 +84,7 @@ class Report:
         return next(filter(lambda x: x.i==fightID, self.fights))
 
     def get_actor(self, name: str) -> List[Actor]:
-        return next(filter(lambda a: a.name == name, self.actors))
+        return [a for a in self.actors if a.name==name]
 
     def get_actor_ids(self, name: str) -> List[int]:
         return [a.i for a in self.actors if a.name == name]
@@ -115,6 +92,7 @@ class Report:
     def get_ability(self, name) -> Ability:
         return next(filter(lambda a: a.name == name, self.abilities))
 
+    @require_phase_model # EventList can access phase events
     def _fetch_events(self, filter_expression: str='', fight_ids: List[Int]=[]) -> EventList:
         start_time = self.start_time
         all_events = []
@@ -130,23 +108,64 @@ class Report:
             all_events += [*map(Event, events['data'])]
             start_time = events['nextPageTimestamp']
 
-        with open('test.json', 'w') as f:
-            for e in all_events:
-                f.write(str(e) + '\n')
-
         return EventList(all_events, self)
 
     def deaths(self) -> EventList:
         return self._fetch_events("inCategory('deaths') = true")
 
-    def actions(self, ability_name: str, actor_name: str='') -> EventList:
+    def casts(self, ability_name: str, actor_name: str='') -> EventList:
         filter_str = f"type='cast' AND ability.name='{ability_name}'"
+        if actor_name:
+            filter_str += f" AND source.name='{actor_name}'"
+        return self._fetch_events(filter_str)
+
+    def actions(self, ability_name: str, actor_name: str='') -> EventList:
+        filter_str = f"ability.name='{ability_name}'"
         if actor_name:
             filter_str += f" AND source.name='{actor_name}'"
         return self._fetch_events(filter_str)
 
     def dummy_downs(self) -> EventList:
         return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
+
+    def gain_aura(self):
+        pass
+
+    def lose_aura(self):
+        pass
+
+    @require_phase_model
+    def output_events(self, events: List[Event], offset: int=0, separator: str='\n') -> None:
+        ls = list()
+        for event in events:
+            phase = self.pm.phase_name(event)
+            time = self._relative_time(event.time + offset)
+            phase_time = self.pm.phase_time(event) / 1000 # in seconds
+            ls.append(f'{self._to_output(time)} {event.fight}{phase}@{phase_time:.0f}s')
+        print(separator.join(ls))
+
+    @require_phase_model
+    def print_pull_times(self) -> Report:
+        """Print start time for all fights"""
+        for fight in self.fights:
+            time = self._relative_time(fight.start_time)
+            phase = self.pm._to_phase_name(fight.last_phase)
+            output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
+            print(output)
+        return self
+
+    @require_phase_model
+    def print_phase_times(self, phases: List[str], offset=0) -> Report:
+        """Takes a list of phase names and outputs the start of those phases"""
+        for phase_event in self.phase_starts(phases):
+            phase = self.pm.phase_name(phase_event)
+            time = self._relative_time(phase_event.time)
+            fightID = phase_event.fight
+
+            output = f'{self._to_output(time)} '
+            output += f'Fight{fightID}:{100 - self.fights_by_id[fightID].percent:.2f}%:{phase}'
+            print(output)
+        return self
 
     # outputs:
     def set_video_offset_time(self, mmss: str, fightID: int) -> Report:
@@ -183,7 +202,8 @@ class Report:
         return self
 
     def _to_output(self, time: int) -> str:
-        assert self.output_type is not None, 'No output_type selected.'
+        if self.output_type is None:
+            raise ValueError('No output type selected.')
 
         match self.output_type:
             case Platform.YOUTUBE:

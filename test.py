@@ -5,50 +5,67 @@ import json
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
 from enums import Encounter, Platform
-from phases import ReportDsu
+from report import Report
 
-def print_json(x):
-    print(json.dumps(x, indent=4))
+from aura import AuraModel
 
-# reportCode = "yqdxtnVaHprck79W" #mira 7/14
+
+def print_a(report):
+    # for my video
+    # anna
+    report.set_video_offset_time('28:57', 1) \
+        .set_output_type(Platform.TWITCH, '1535990224')
+
+    # report.deaths().to("Mayu Sakuma").print()
+
+    # yoon 
+    report.set_video_offset_time('1:06', 1)\
+        .set_output_type(Platform.TWITCH, '1536014750')\
+        .casts('Standard Step').in_phases(['P5']).print(-5000)
+
+
+
+    
+    
 # reportCode = "GhQRrD2kK8yB379d" # top ast clear pull 36
 # fightID = 36
 # reportCode = "PkaMGFgDf7hBWn2p" # mira clear pull 62
 # fightID = 62
 
-def print_abilities(report):
-    # for my video
-    report.set_video_offset_time('03:19', 1) \
-        .set_output_type(Platform.YOUTUBE)
-    report.print_phase_times(["P5"])
-
-    print("double_midare")
-    double_midare = report.actions("Kaeshi: Setsugekka")
-    # [print(x) for x in double_midare]
-    double_midare = double_midare.in_phases(["P4", "I", "P5"])
-    report.output_events(double_midare, -7000, ' ')
-
-
-    p_balance = report.actions("Perfect Balance").in_phases(["P3", "P5"])
-    print("Perfect Balance")
-    report.output_events(p_balance, -5000, ' ')
-
-    # anna's POV
-    report.set_video_offset_time('01:31', 1) \
-        .set_output_type(Platform.TWITCH, '1533795273')
-
-    print("double_midare")
-    report.output_events(double_midare, -7000)
-
-    print("wrath")
-    wrath = report.actions("Wrath of the Heavens")
-    report.output_events(wrath, -3700)
-
-reportCode = "tbXZ3WJf9czhQyD6" # long pull 38
-fightID = 38
+reportCode = "TwzV7fmdhpA1gykF"
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
-report = ReportDsu(reportCode, client, Encounter.DSU)
-print_abilities(report)
+# report = Report(reportCode, client, Encounter.DSU)
+# print_a(report)
 
+# report.set_video_offset_time('1:06', 1)\
+#     .set_output_type(Platform.TWITCH, '1536014750')\
 
+# with open('test.json', 'w') as f:
+#     report.print_pull_times()
+#     report.actions("Ancient Quaga").in_phase("P2").named().write(f).print()
+
+am = AuraModel('19M43vwFh6GtAcCp', client, None)
+am.test()
+
+# Q_TABLE = """
+# query Graph {
+#     rateLimitData {
+#         limitPerHour
+#         pointsSpentThisHour
+#     }
+#     reportData {
+#         report(code: "TwzV7fmdhpA1gykF") {
+#             table( 
+#                 startTime: 0, endTime: 9999999999,
+#                 encounterID: 1065,
+#                 filterExpression: "ability.name='Ancient Quaga'",
+#                 fightIDs: [30])
+#         }
+#     }
+# }
+# """
+
+# res = client.q(Q_TABLE, {})
+
+# print(json.dumps(res, indent=4))

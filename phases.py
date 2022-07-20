@@ -5,56 +5,99 @@ import itertools
 import json
 
 from enums import Encounter
-from queries import Q_TIMELINE
-from events import Event
-from report import Report
+from queries import Q_FIGHTS
+from data import Event, Fight
 
-def require_model(func):
+Q_TIMELINE = """
+query Timeline ($reportCode: String!, $encounterID: Int!, $startTime: Float, $endTime: Float){
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            deaths: events(dataType: Deaths, hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
+                startTime: $startTime, endTime: $endTime) {
+                data
+                # nextPageTimestamp
+            }
+            targetable: events(hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
+                filterExpression: "type='targetabilityupdate'",
+                startTime: $startTime, endTime: $endTime) {
+                data
+                # nextPageTimestamp
+            }
+        }
+    }
+}
+"""
+
+def require_timeline(func):
     '''Decorator that calls build on the model if needed before the function'''
     def ensured(*args, **kwargs):
         self = args[0]
-        if self.timelines is None:
-            self.build()
+        event = args[1]
+        fight_id = event.fight
+        if fight_id not in self.timelines:
+            self.timelines[fight_id] = self.build(fight_id)
+
         return func(*args, **kwargs)
     return ensured
 
-class PhaseReport(Report):
-    """Builds a timeline of events based on a list of fights"""
+class PhaseModel:
+    """
+    Returns phase information about an event. Builds a timeline of events for a report.
+    By searching for particular kinds of events, a fight will produce a predictable series of events.
+    A timeline is a list of events, or checkpoints, that mark the progression of a fight.
+    The first event is the start of the first phase, the second event is the start of the second, etc.
+    """
 
-    # override
-    def build():
+    def build(self, fight_id: int) -> List[Event]:
+        """Creates timeline for one fight"""
         raise NotImplementedError('Use subclass of PhaseReport')
 
-    def __init__(self, code: str, client: FFClient, encounter: Encounter) -> None:
-        super().__init__(code, client, encounter)
+    def __init__(self, code: str, client: FFClient, report: Report) -> None:
+        self.code = code
+        self._report = report
+        self.encounter = report.encounter
+        self._client = client
 
         # override
-        self._PHASE_NAMES = None
-        self._EVENT_INDEX = None
+        self.PHASE_NAMES = None
 
-        # populated by build()
-        self.timelines = None
+        # Dict[fight_id: timeline], populated by build()
+        self.timelines = dict() 
 
-    def _fetch_timeline_events(self) -> Dict[str, Any]:
+    def _fetch_fight(self, fight_id: int) -> Fight:
+        """Fetch one fight from the report"""
+        res = self._client.q(Q_FIGHTS, {
+            'reportCode': self.code,
+            'encounterID': self.encounter.value,
+            'fightIDs': [fight_id]})
+        return Fight(res['reportData']['report']['fights'][0])
+
+    def _fetch_timeline_events(self, fight: Fight) -> Dict[str, Any]:
         """Returns response from server containing timeline events"""
         res = self._client.q(Q_TIMELINE, {
-            'reportCode': self.code, 
+            'reportCode': self.code,
             'encounterID': self.encounter.value,
-            'startTime': self.fights[0].start_time, 
-            'endTime': self.fights[-1].end_time})
+            'startTime': fight.start_time, 
+            'endTime': fight.end_time})
         return res
 
-    @require_model
+    @require_timeline
     def phase(self, event: Event) -> int:
-        """Returns the phase index of the event"""
-        timeline = self.timelines[event.fight]
+        """Returns the phase number of the event"""
+        timeline = self.timelines[event.fight] 
         passed_checkpoints = [e for e in timeline if e.time <= event.time]
         return len(passed_checkpoints) - 1
 
     def phase_name(self, event: Event) -> int:
-        return self.phase_from_index(self.phase(event))
+        return self._to_phase_name(self.phase(event))
 
-    @require_model
+    @require_timeline
     def phase_start(self, event: Event) -> Event:
         """Returns the event that marks the start of the phase"""
         timeline = self.timelines[event.fight]
@@ -65,75 +108,35 @@ class PhaseReport(Report):
         """Returns phase-relative time of event (in ms)"""
         return event.time - self.phase_start(event).time
 
-    @require_model
     def phase_starts(self, phases: List[str]) -> List[Event]:
         """Returns a list of events corresponding to the start of phase_index phases"""
-        phase_indexes = [self.index_from_phase(p) for p in phases]
+        phase_indexes = [self._to_phase_index(p) for p in phases]
         phase_events = list()
         for timeline in self.timelines.values():
             phase_events += [timeline[i] for i in phase_indexes if i < len(timeline)]
         return phase_events
 
-    @require_model
-    def get_fight_timeline(self, fight_id: int) -> List[Event]:
-        return self.timelines[fight_id]
+    def valid_phase(self, phase: str) -> bool:
+        return phase in self.PHASE_NAMES
 
-    def phase_from_index(self, index: int) -> str:
-        return [x[1] for x in self._PHASE_NAMES if index in x][0]
+    def _to_phase_name(self, index: int) -> str:
+        return self.PHASE_NAMES[index]
 
-    def index_from_phase(self, phase: str) -> int:
-        return [x[0] for x in self._PHASE_NAMES if phase in x][0]
+    def _to_phase_index(self, phase: str) -> int:
+        return self.PHASE_NAMES.index(phase)
 
-    def output_events(self, events: List[Event], offset: int=0, separator: str='\n') -> None:
-        ls = list()
-        for e in events:
-            phase = self.phase_name(e)
-            time = self._relative_time(e.time + offset)
-            phase_time = self.phase_time(e) / 1000
-            ls.append(f'{self._to_output(time)} {e.fight}{phase}@{phase_time:.0f}s')
-        print(separator.join(ls))
 
-    def print_pull_times(self) -> Report:
-        """Print start time for all fights"""
-        for fight in self.fights:
-            time = self._relative_time(fight.startTime)
-            phase = self._phase_model.phase_from_index(fight.lastPhase)
-            output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
-            print(output)
-        return self
-
-    def print_phase_times(self, phases: List[str], offset=0) -> Report:
-        """Takes a list of phase names and outputs the start of those phases"""
-        for phase_event in self.phase_starts(phases):
-            phase = self.phase_name(phase_event)
-            time = self._relative_time(phase_event.time)
-            fightID = phase_event.fight
-
-            output = f'{self._to_output(time)} '
-            output += f'Fight{fightID}:{100 - self.fights_by_id[fightID].percent:.2f}%:{phase}'
-            print(output)
-        return self
-
-class ReportDsu(PhaseReport):
+class PhaseModelDsu(PhaseModel):
     def __init__(self, code: str, client: FFClient, encounter: Encounter):
-        super().__init__(code, client, encounter)
-
         if encounter is not Encounter.DSU:
             raise TypeError(f'Using DSU model for {encounter}')
 
-    def build(self):
-        """Creates a list of events relevant to the timeline"""
-        self._PHASE_NAMES = [
-            (0, "P1"),
-            (1, "P2"),
-            (2, "P3"),
-            (3, "P4"),
-            (4, "I"),
-            (5, "P5"),
-            (6, "P6"),
-            (7, "P7"),]
+        super().__init__(code, client, encounter)
 
-        self._EVENT_INDEX = [
+        self.PHASE_NAMES = ["P1", "P2", "P3", "P4", "I", "P5", "P6", "P7"]
+
+    def build(self, fight_id: int) -> List[Event]:
+        EVENT_INDEX = [
             2, # Thordan Death
             4, # Nidhogg Death
             8, # Both eyes dead
@@ -141,46 +144,46 @@ class ReportDsu(PhaseReport):
             16, # Dragons targetable
             26,] # Dragon-King thordan targetable
 
-        res = self._fetch_timeline_events()
+        fight = self._fetch_fight(fight_id)
+
+        # special case fight ended phase 1; timeline is a single event: fight start
+        if fight.last_phase == 0: # Fight ended phase 1
+            timeline = [Event.from_time(fight.start_time, fight.i)] # p1 start == fight start
+            return timeline
+
+        res = self._fetch_timeline_events(fight)
         report = res['reportData']['report']
 
+        # Events for this fight is only based on deaths and boss targetables.
         targetable = map(Event, report['targetable']['data'])
+        targetable = filter(lambda e: e.etc['targetable']==True, targetable)
         deaths = map(Event, report['deaths']['data'])
 
-        # filter for become targetable
-        targetable = filter(lambda e: e.etc['targetable']==True, targetable) 
-
+        # Join both types of events and order chronologically
         phase_events = itertools.chain(deaths, targetable)
         phase_events = sorted(phase_events, key=lambda e: e.time)
 
-        timelines = dict() # timeline is a list of events that mark a beginning of a phase
-        for fight in self.fights:
-            # look at events for specific fight
-            events = [e for e in phase_events if e.fight==fight.i]
-            
-            timeline = list()
-            if fight.lastPhase == 0: # Adelphel, Grinnaux, and Charlbert
-                timeline = [Event.from_time(fight.start_time, fight.i)] # p1 start == fight start
+        # special P1 -> P2 case
+        if fight.last_phase == 1 and len(phase_events) > 2:
+            # In phase 1, first event is Adelphel targetable. Third is Charlbert
+            if phase_events[0].target != phase_events[2].target: 
+                # timeline is start of P1, Thordan appearing (4th event)
+                timeline = [Event.from_time(fight.start_time, fight.i), phase_events[4]]
+        else:
+            # Assume started P2
+            # p1 start in the undefined past(-1 time), p2 start is fight start
+            timeline = [Event.from_time(-1, fight.i), Event.from_time(fight.start_time, fight.i)]
+            # then, include events based on the event index.
+            timeline += [phase_events[i] for i in EVENT_INDEX if i < len(phase_events)]
+        
+        return timeline
 
-            # special P1 -> P2 case
-            elif fight.lastPhase == 1 and len(events) > 2: # King Thordan
-                # if phase 1, first event is Adelphel targetable. Third is Charlbert
-                if events[0].target != events[2].target: 
-                    timeline = [
-                        Event.from_time(fight.start_time, fight.i), 
-                        events[4]]
+class PhaseModelTea(PhaseModel):
+    def __init__(self, code: str, client: FFClient, encounter: Encounter):
+        super().__init__(code, client, encounter)
 
-            else:
-                # Assume started P2
-                # p1 start in the undefined past, p2 start == fight start
-                timeline = [Event.from_time(-1, fight.i), Event.from_time(fight.start_time, fight.i)]
-                timeline += [events[i] for i in self._EVENT_INDEX if i < len(events)]
-            
-            timelines[fight.i] = timeline
-        self.timelines = timelines
+        if encounter is not Encounter.TEA:
+            raise TypeError(f'Using TEA model for {encounter}')
 
-        with open('timelines.json', 'w') as f:
-            for i, timeline in timelines.items():
-                f.write(f'fight{i}')
-                for e in timeline:
-                    f.write(str(e))
+    def build(self):
+        raise NotImplementedError
