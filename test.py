@@ -23,16 +23,12 @@ def print_a(report):
         .set_output_type(Platform.TWITCH, '1536014750')\
         .casts('Standard Step').in_phases(['P5']).print(-5000)
 
-
-
-    
-    
 # reportCode = "GhQRrD2kK8yB379d" # top ast clear pull 36
 # fightID = 36
 # reportCode = "PkaMGFgDf7hBWn2p" # mira clear pull 62
 # fightID = 62
 
-reportCode = "TwzV7fmdhpA1gykF"
+reportCode = "19M43vwFh6GtAcCp"
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
@@ -45,7 +41,7 @@ report = Report(reportCode, client, Encounter.DSU)
 #     report.print_pull_times()
 #     report.actions("Ancient Quaga").in_phase("P2").named().write(f).print()
 
-am = AuraModel('19M43vwFh6GtAcCp', client, report)
+am = AuraModel(client, report)
 am.test()
 
 # Q_TABLE = """

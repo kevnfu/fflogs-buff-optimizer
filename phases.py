@@ -120,11 +120,11 @@ class PhaseModel:
 
 
 class PhaseModelDsu(PhaseModel):
-    def __init__(self, code: str, client: FFClient, encounter: Encounter):
-        if encounter is not Encounter.DSU:
+    def __init__(self, code: str, client: FFClient, report: Report):
+        if report.encounter is not Encounter.DSU:
             raise TypeError(f'Using DSU model for {encounter}')
 
-        super().__init__(code, client, encounter)
+        super().__init__(code, client, report)
 
         self.PHASE_NAMES = ["P1", "P2", "P3", "P4", "I", "P5", "P6", "P7"]
 

@@ -4,26 +4,40 @@ from typing import Any
 import json
 
 from enums import Encounter
-from data import Event
+from data import Event, EventList
 
+# does not include healing events
 Q_AURAS = """
-query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $filter: String, $fightIDs: [Int]) {
+query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
     rateLimitData {
         limitPerHour
         pointsSpentThisHour
     }
     reportData {
         report(code: $reportCode) {
-            buffs: events(limit: 10000, dataType: Buffs
+            auras: events(limit: 10000, dataType: Buffs, # hostilityType: Enemies,
                 startTime: $startTime, endTime: $endTime,
-                filterExpression: $filter,
+                filterExpression: "inCategory('auras')=true AND inCategory('healing')=false AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
                 fightIDs: $fightIDs) {
                 data
                 nextPageTimestamp
             }
-            debuffs: events(limit: 10000, dataType: Debuffs
+        }
+    }
+}
+"""
+
+Q_HEALING_AURAS = """
+query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            auras: events(limit: 10000, dataType: Buffs, # hostilityType: Enemies,
                 startTime: $startTime, endTime: $endTime,
-                filterExpression: $filter,
+                filterExpression: "inCategory('auras')=true AND inCategory('healing')=true AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
                 fightIDs: $fightIDs) {
                 data
                 nextPageTimestamp
@@ -35,25 +49,41 @@ query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $filter: 
 
 class AuraModel:
 
-    def __init__(self, code: str, client: FFClient, report: Report):
-        self.code = code
+    def __init__(self, client: FFClient, report: Report):
+        self.code = report.code
         self._report = report
         self._client = client
 
-    def test(self):
-        fight = self._report.get_fight(1)
+    def _fetch_auras(self, fight: Fight) -> EventList:
+        all_events = []
+        start_time = fight.start_time
+        while start_time:
+            res = self._client.q(Q_AURAS, params={
+                'reportCode': self.code,
+                'startTime': start_time, 
+                'endTime': fight.end_time,
+                'fightIDs': [fight.i]})
+            events = res['reportData']['report']['auras']
+            all_events += [Event(e) for e in events['data']]
+            start_time = events['nextPageTimestamp']
+        return EventList(all_events, self._report)
 
-        res = self._client.q(Q_AURAS, {
-            'reportCode': self.code,
-            'startTime': fight.start_time,
-            'endTime': fight.end_time,})
-        report = res['reportData']['report']
-        buffs = [Event(e) for e in report['buffs']['data']]
-        debuffs = [Event(e) for e in report['debuffs']['data']]
+    def test(self):
+        fight = self._report.get_fight(25)
+        auras = self._fetch_auras(fight)
+        print(len(auras))
 
         with open('test.json', 'w') as f:
-            for buff in buffs:
-                f.write(str(buff) + '\n')
+            auras.named().write(f)
+        
+
+    def all_on(self, target: int, time: int) -> list(Event):
+        """All auras on one person at a specific time, returning the list of apply events"""
+        pass
+
+    def aura(self, aura: int) -> list(Event):
+        """All occurences of an aura, returning the list of apply events"""
+        pass
 
 
 

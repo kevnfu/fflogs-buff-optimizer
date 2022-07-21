@@ -60,6 +60,10 @@ class EventList:
         new_list = [e for e in self._ls if e.type_==type_str]
         return EventList(new_list, self._r)
 
+    def types(self, types: list(str)) -> EventList:
+        new_list = [e for e in self._ls if e.type_ in types]
+        return EventList(new_list, self._r)
+
     def in_phase(self, phase: str) -> EventList:
         new_list = [e for e in self._ls if self._r.pm.phase_name(e) == phase]
         return EventList(new_list, self._r).order_by_phase_time()
@@ -77,13 +81,19 @@ class EventList:
         return EventList(new_list, self._r)
 
     def by(self, name: str) -> EventList:
-        actor_ids = self._r.get_actor_ids(name)
-        new_list = [e for e in self._ls if e.source in actor_ids]
+        if type(self._ls[0].source) is int:
+            actor_ids = self._r.get_actor_ids(name)
+            new_list = [e for e in self._ls if e.source in actor_ids]
+        else:
+            new_list = [e for e in self._ls if e.source is name]
         return EventList(new_list, self._r)
 
     def to(self, name: str) -> EventList:
-        actor_ids = self._r.get_actor_ids(name)
-        new_list = [e for e in self._ls if e.target in actor_ids]
+        if type(self._ls[0].target) is int:
+            actor_ids = self._r.get_actor_ids(name)
+            new_list = [e for e in self._ls if e.target in actor_ids]
+        else:
+            new_list = [e for e in self._ls if e.target is name]
         return EventList(new_list, self._r)
 
     def order_by_time(self) -> EventList:
@@ -106,8 +116,11 @@ class EventList:
         for event in self._ls:
             event.source = self._r.actors_by_id[event.source].name
             event.target = self._r.actors_by_id[event.target].name
+
             if 'abilityGameID' in event.etc:
                 event.etc['abilityGameID'] = self._r.abilities_by_id[event.etc['abilityGameID']].name
+            if 'extraAbilityGameID' in event.etc:
+                event.etc['extraAbilityGameID'] = self._r.abilities_by_id[event.etc['extraAbilityGameID']].name
         return self
 
     def print(self) -> EventList:

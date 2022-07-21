@@ -91,7 +91,13 @@ class Report:
     # get child elements
     def get_fight(self, fight_id: int) -> Fight:
         """Returns fight from self._fights, or tries to get from server"""
-        return self._fights.setdefault(fight_id, self._fetch_fight(fight_id))
+        if fight:=self._fights.get(fight_id):
+            return fight
+        elif fight:=self._fetch_fight(fight_id):
+            self._fights[fight_id] = fight
+            return fight
+        else:
+            return None
 
     def first_fight(self) -> Fight:
         return self._fights[min(self._fights.keys())]
@@ -103,7 +109,7 @@ class Report:
         return [a for a in self.actors if a.name==name]
 
     def get_actor_ids(self, name: str) -> list[int]:
-        return [a.i for a in self.actors if a.name == name]
+        return [a.i for a in self.actors if a.name==name]
 
     def get_ability(self, name) -> Ability:
         return next(filter(lambda a: a.name==name, self.abilities))
