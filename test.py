@@ -6,7 +6,7 @@ from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
 from enums import Encounter, Platform
 from report import Report
-
+from data import Event
 from aura import AuraModel
 
 
@@ -42,7 +42,13 @@ report = Report(reportCode, client, Encounter.DSU)
 #     report.actions("Ancient Quaga").in_phase("P2").named().write(f).print()
 
 am = AuraModel(client, report)
-am.test()
+aura_list = am.all_on_event(Event.from_time(9167232, 25))
+
+print(aura_list)
+# events = report._fetch_events('', 25)
+
+# with open('test.json', 'w') as f:
+#     aura_list.named().write(f)
 
 # Q_TABLE = """
 # query Graph {

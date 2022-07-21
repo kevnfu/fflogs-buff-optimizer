@@ -25,7 +25,7 @@ class Event:
 
     def to_dict(self):
         return {
-            'time':self.time, 
+            'timestamp':self.time,
             'type': self.type_, 
             'sourceID': self.source,
             'targetID': self.target,
@@ -40,6 +40,7 @@ class Event:
             'sourceID': -1,
             'targetID': -1,
             'fight': fight})
+
 
 
 class EventList:
@@ -96,8 +97,16 @@ class EventList:
             new_list = [e for e in self._ls if e.target is name]
         return EventList(new_list, self._r)
 
-    def order_by_time(self) -> EventList:
-        self._ls.sort(key=lambda i: i.time)
+    def before(self, event: Event) -> EventList:
+        self._ls = [e for e in self._ls if e.time <= event.time]
+        return self
+
+    def after(self, event: Event) -> EventList:
+        self._ls = [e for e in self._ls if e.time >= event.time]
+        return self
+
+    def order_by_time(self, /, reverse=False) -> EventList:
+        self._ls.sort(key=lambda i: i.time, reverse=reverse)
         return self
 
     def order_by_phase(self) -> EventList:
@@ -116,6 +125,7 @@ class EventList:
         for event in self._ls:
             event.source = self._r.actors_by_id[event.source].name
             event.target = self._r.actors_by_id[event.target].name
+            event.etc['fighttime'] = event.time - self._r.get_fight(event.fight).start_time
 
             if 'abilityGameID' in event.etc:
                 event.etc['abilityGameID'] = self._r.abilities_by_id[event.etc['abilityGameID']].name
@@ -147,6 +157,10 @@ class EventList:
 
     def __len__(self):
         return self._ls.__len__()
+
+    def __reversed__(self):
+        return self.order_by_time(reverse=True)
+
 
 @dataclass
 class Actor:
