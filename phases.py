@@ -8,8 +8,6 @@ from enums import Encounter
 from queries import Q_FIGHTS, Q_TIMELINE
 from data import Event, Fight
 
-
-
 def require_timeline(func):
     '''Decorator that calls build on the model if needed before the function'''
     def ensured(*args, **kwargs):
@@ -67,7 +65,7 @@ class PhaseModel:
         passed_checkpoints = [e for e in timeline if e.time <= event.time]
         return len(passed_checkpoints) - 1
 
-    def phase_name(self, event: Event) -> int:
+    def phase_name(self, event: Event) -> str:
         return self._to_phase_name(self.phase(event))
 
     @require_timeline
@@ -105,7 +103,7 @@ class PhaseModel:
 class PhaseModelDsu(PhaseModel):
     def __init__(self, report: Report):
         if report.encounter is not Encounter.DSU:
-            raise TypeError(f'Using DSU model for {encounter}')
+            raise TypeError(f'Using DSU model for {encounter=}')
 
         super().__init__(report)
 
@@ -120,7 +118,7 @@ class PhaseModelDsu(PhaseModel):
             16, # Dragons targetable
             26,] # Dragon-King thordan targetable
 
-        fight = self._report.get_fight(fight_id)
+        fight = self._report.fight(fight_id)
 
         # special case fight ended phase 1; timeline is a single event: fight start
         if fight.last_phase == 0: # Fight ended phase 1
@@ -159,7 +157,7 @@ class PhaseModelTea(PhaseModel):
         super().__init__(code, client, encounter)
 
         if encounter is not Encounter.TEA:
-            raise TypeError(f'Using TEA model for {encounter}')
+            raise TypeError(f'Using TEA model for {encounter=}')
 
     def build(self):
         raise NotImplementedError

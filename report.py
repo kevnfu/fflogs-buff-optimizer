@@ -32,6 +32,7 @@ class Report:
 
         self._fetch_master_data()
         self._fights = self._fetch_all_fights() # {fight id: fight}
+        self._events = dict() # {fight id: EventList w/ all events}
 
     def _fetch_master_data(self) -> None:
         res = self._client.q(Q_MASTER_DATA, {
@@ -81,7 +82,7 @@ class Report:
             return None
 
     # get child elements
-    def get_fight(self, fight_id: int) -> Fight:
+    def fight(self, fight_id: int) -> Fight:
         """Returns fight from self._fights, or tries to get from server"""
         if fight:=self._fights.get(fight_id, None):
             return fight
@@ -97,68 +98,87 @@ class Report:
     def last_fight(self) -> fights:
         return self._fights[max(self._fights.keys())]
 
-    def get_actor(self, name: str) -> list[Actor]:
-        return [a for a in self.actors if a.name==name]
-
-    def get_actor_name(self, i: int) -> str:
-        return next(filter(lambda a: a.i==i, self.actors)).name
+    def get_actor(self, name_or_id: str | int) -> list[Actor] | Actor:
+        if isinstance(name_or_id, str):
+            return [a for a in self.actors if a.name==name_or_id]
+        elif isinstance(name_or_id, int):
+            return next(filter(lambda a: a.i==name_or_id, self.actors))
+        else:
+            raise TypeError(f'Needs a name or id, got {name_or_id=}')
 
     def get_actor_ids(self, name: str) -> list[int]:
-        return [a.i for a in self.actors if a.name==name]
+        return [a.i for a in self.get_actor(name)]
 
-    def get_ability(self, name: str) -> list[Ability]:
-        return list(filter(lambda a: a.name==name, self.abilities))
+    def get_ability(self, name_or_id: str | int) -> list[int] | str:
+        if isinstance(name_or_id, str):
+            return [a.i for a in self.abilities if a.name==name_or_id]
+        elif isinstance(name_or_id, int):
+            return next(filter(lambda a: a.i==name_or_id, self.abilities)).name
+        else:
+            raise TypeError(f'needs str or int, got {name_or_id=}')
 
-    def get_ability_name(self, i: int) -> str:
-        return next(filter(lambda a: a.i==i, self.abilities)).name
-
-    def get_phase_model(self) -> PhaseModel:
-        return self.pm
-
-    def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
-        start_time = self.first_fight().start_time
-        all_events = []
+    def _fetch_all_events(self, fight_id: int) -> EventList:
+        fight = self.fight(fight_id)
+        start_time = fight.start_time
+        all_events = list()
         while start_time:
             res = self._client.q(Q_EVENTS, params={
                 'reportCode': self.code,
                 'encounterID': self.encounter.value,
-                'startTime': start_time, 
-                'endTime': self.last_fight().end_time,
-                'filter': filter_expression,
-                'fightIDs': fight_ids})
+                'startTime': start_time,
+                'endTime': fight.end_time,
+                'fightIDs': [fight_id]})
             events = res['reportData']['report']['events']
             all_events += [*map(Event, events['data'])]
             start_time = events['nextPageTimestamp']
 
         return EventList(all_events, self)
 
-    def filter(self, filter_str: str, fight_id: int=None) -> EventList:
-        if fight_id:
-            return self._fetch_events(filter_str, [fight_id])
-        else:
-            return self._fetch_events(filter_str)
+    def events(self, fight_id: int) -> EventList:
+        if self.fight(fight_id) is None:
+            return None
+        if fight_id not in self._events:
+            self._events[fight_id] = self._fetch_all_events(fight_id)
+        return EventList(self._events[fight_id], self)
 
-    def deaths(self) -> EventList:
-        return self._fetch_events("inCategory('deaths') = true")
+    # def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
+    #     start_time = self.first_fight().start_time
+    #     all_events = []
+    #     while start_time:
+    #         res = self._client.q(Q_EVENTS, params={
+    #             'reportCode': self.code,
+    #             'encounterID': self.encounter.value,
+    #             'startTime': start_time,
+    #             'endTime': self.last_fight().end_time,
+    #             'filter': filter_expression,
+    #             'fightIDs': fight_ids})
+    #         events = res['reportData']['report']['events']
+    #         all_events += [*map(Event, events['data'])]
+    #         start_time = events['nextPageTimestamp']
 
-    def casts(self, ability_name: str, *args) -> EventList:
-        filter_str = f'type="cast" AND ability.name="{ability_name}"'
-        return self.filter(filter_str, *args)
+    #     return EventList(all_events, self)
 
-    def actions(self, ability_name: str, *args) -> EventList:
-        filter_str = f'ability.name="{ability_name}"'
-        return self.filter(filter_str, *args)
+    # def filter(self, filter_str: str, fight_id: int=None) -> EventList:
+    #     if fight_id:
+    #         return self._fetch_events(filter_str, [fight_id])
+    #     else:
+    #         return self._fetch_events(filter_str)
 
-    def dummy_downs(self) -> EventList:
-        return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
+    # def deaths(self, fight_id: int) -> EventList:
+    #     return self._fetch_events("inCategory('deaths') = true", [fight_id])
 
-    def gain_aura(self):
-        pass
+    # def casts(self, ability_name: str, *args) -> EventList:
+    #     filter_str = f'type="cast" AND ability.name="{ability_name}"'
+    #     return self.filter(filter_str, *args)
 
-    def lose_aura(self):
-        pass
+    # def actions(self, ability_name: str, *args) -> EventList:
+    #     filter_str = f'ability.name="{ability_name}"'
+    #     return self.filter(filter_str, *args)
 
-    def links(self, events: list[Event], offset: int=0, separator: str='\n') -> None:
+    # def dummy_downs(self) -> EventList:
+    #     return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
+
+    def links(self, events: EventList, offset: int=0, separator: str='\n') -> None:
         ls = list()
         for event in events:
             phase = self.pm.phase_name(event)
@@ -184,7 +204,7 @@ class Report:
             fight_id = phase_event.fight
 
             output = f'{self._to_output(time)} '
-            output += f'Fight{fight_id}:{100 - self.get_fight(fight_id).percent:.2f}%:{phase}'
+            output += f'Fight{fight_id}:{100 - self.fight(fight_id).percent:.2f}%:{phase}'
             print(output)
         return self
 
@@ -194,7 +214,7 @@ class Report:
         minutes, seconds = mmss.split(':')
         ms = int(minutes)*1000*60 + int(seconds)*1000
 
-        fight = self.get_fight(fight_id)
+        fight = self.fight(fight_id)
         self.offset = ms - fight.start_time
         return self
 

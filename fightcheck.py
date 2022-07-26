@@ -8,21 +8,22 @@ from client import FFClient
 from report import Report
 from data import EventList
 
-class EncounterChecker:
+class FightCheck:
     class Mit:
         DEBUFFS = set(['Reprisal', 'Feint', 'Addle'])
         # DEBUFFS = set([7535, 1001193, 7549, 1001195, 7560, 10012030])
 
-        def __init__(self, ec: EncounterChecker) -> None:
-            self.ec = ec
-            self._r = ec._r
-            self._am = ec._am
-            self.fight = ec.fight
+        def __init__(self, fc: FightCheck) -> None:
+            self.fc = fc
+            self._r = fc._r
+            self._am = fc._am
+            self.fight = fc.fight
+            self.events = fc.events
 
         def at(self, boss_cast: str, occurance: int=0) -> Mit:
             self.event_name = boss_cast
             try:
-                events = self._r.casts(boss_cast, self.fight.i)
+                events = self.events.casts(boss_cast)
                 # sometimes boss casts will have two events, an incorrect one targeting themselves.
                 events = [*filter(lambda x: x.source!=x.target, events)]
                 
@@ -59,17 +60,14 @@ class EncounterChecker:
             return self
 
         def check(self, f: File) -> None:
-            if not hasattr(self, 'event'): 
-                if not hasattr(self, 'event_name'):
-                    f.write(f'Not reached\n')
-                    return
-                f.write(f'{self.event_name.upper()} Not reached\n')
-                return
-            else:
+            try:
                 time = (self.event.time - self.fight.start_time)/1000
                 seconds = time % 60
                 minutes = int(time / 60)
                 f.write(f'{self.event_name.upper()} @ {minutes:02d}:{seconds:03.1f}')
+            except AttributeError:
+                f.write(f'No event\n')
+                return
 
             mit_list = set(self.mit_list + ['Well Fed'])
             debuffs = mit_list & self.DEBUFFS
@@ -81,13 +79,13 @@ class EncounterChecker:
 
             # boss should have debuffs
             boss_id = self.event.source
-            boss_name = self._r.get_actor_name(boss_id)
+            boss_name = self._r.get_actor(boss_id).name
             boss_missing = debuffs - set(active_auras.get(boss_name, list()))
             missing[boss_name] = boss_missing
 
             # players should have buffs
             for player_id in self.players:
-                player_name = self._r.get_actor_name(player_id)
+                player_name = self._r.get_actor(player_id).name
                 player_auras = active_auras.get(player_name, list())
                 player_missing = buffs - set(player_auras)
                 missing[player_name] = player_missing
@@ -109,16 +107,27 @@ class EncounterChecker:
         self._am = report.am
 
     def mit(self):
-        return EncounterChecker.Mit(self)
+        return FightCheck.Mit(self)
 
     def passed(self, boss_cast: str) -> bool:
-        return len(self._r.casts(boss_cast, self.fight.i)) > 0
+        return len(self.events.casts(boss_cast)) > 0
 
-    def execute(self, fight_id: int) -> None:
-        self.fight = self._r.get_fight(fight_id)
-        if self.fight is None:
-            print("No fight")
-            return
+    def run(self, fight_id: int) -> bool:
+        """Returns true if success, false if failure"""
+        raise NotImplementedError('Run subclass')
+
+class FightCheckDsu(FightCheck):
+    def __init__(self, report: Report):
+        if report.encounter is not Encounter.DSU:
+            raise TypeError(f'Using DSU checker for {encounter=}')
+        super().__init__(report)
+
+    def run(self, fight_id: int) -> None:
+        self.fight = self._r.fight(fight_id)
+        self.events = self._r.events(fight_id)
+        if self.fight is None or self.events is None:
+            print("No fight/events")
+            return False
 
         tank1 = 'Daellin Kannose'
         tank2 = 'Pamella Royce'
@@ -127,7 +136,7 @@ class EncounterChecker:
             f.write(f'{self.fight.i=}\n')
             if self.fight.last_phase == 0: return # ignore door
             self.p2_thordan(f)
-            if self.fight.last_phase == 1: return # p2 
+            if self.fight.last_phase == 1: return # p2
             self.p3_nidhogg(f)
             if self.fight.last_phase == 2: return
             self.p4_eyes(f)
@@ -135,6 +144,8 @@ class EncounterChecker:
             self.i1_intermission(f)
             if self.fight.last_phase == 4: return
             self.p5_thordan(f)
+
+        return True
 
 
     def p2_thordan(self, f: File) -> None:
@@ -235,10 +246,10 @@ class EncounterChecker:
                 'Improvised Finish',
                 'Eukrasian Prognosis'
             ]).check(f)
-        
+
         # WYRMHOLE
         f.write('\nWYRMHOLE\n')
-        if len(self._r.casts('Dive from Grace')) <= 0:
+        if len(self.events.casts('Dive from Grace')) <= 0:
             f.write('not reached\n')
             return
 
@@ -278,7 +289,7 @@ class EncounterChecker:
 
         # 4 towers-not implemented
 
-        tether = self._r.casts('Soul Tether', self.fight.i)
+        tether = self.events.casts('Soul Tether')
         self.mit().at_event(tether.to('Daellin Kannose'))\
             .has('Daellin Kannose', [
                 'Rampart',
@@ -307,7 +318,7 @@ class EncounterChecker:
         f.write(f'{initial_red=}\n')
 
         # first 2 casts are non-damaging
-        dives = self._r.casts('Mirage Dive', self.fight.i)[2:]
+        dives = self.events.casts('Mirage Dive')[2:]
         dive_targets = dives.named().to_target()
 
         red = self._am.applied_at(dives[0]).ability('Clawbound')
@@ -325,7 +336,7 @@ class EncounterChecker:
 
     def i1_intermission(self, f: File) -> None:
         f.write('\nINTERMISSION\n')
-        brightwing = self._r.casts('Brightwing', self.fight.i)
+        brightwing = self.events.casts('Brightwing')
         brightwing_order = brightwing.named().to_target()
         f.write(f'{brightwing_order=}\n')
         self.mit().at_event(brightwing.to(brightwing_order[0]))\
@@ -347,8 +358,8 @@ class EncounterChecker:
 
         self.mit().at('Pure of Heart')\
             .all_have([
-                'Dark Missionary', 
-                'Heart of Light', 
+                'Dark Missionary',
+                'Heart of Light',
                 'Magick Barrier',
                 'Reprisal',
                 'Addle',
@@ -361,10 +372,10 @@ class EncounterChecker:
         f.write('Wrath of the Heavens\n')
 
         lightning = self._am.aura_on('Thunderstruck', self.fight.i)
-        defamation = self._r.casts('Skyward Leap', self.fight.i).in_phase("P5").named().to_target()
-        tethers = self._r.casts('Spiral Pierce', self.fight.i).named().to_target()
-        liquid_heaven = self._r.actions('Liquid Heaven', self.fight.i)\
-            .type_("calculateddamage").named().to_target()
+        defamation = self.events.casts('Skyward Leap').in_phases("P5").named().to_target()
+        tethers = self.events.casts('Spiral Pierce').named().to_target()
+        liquid_heaven = self.events.ability('Liquid Heaven')\
+            .types("calculateddamage").named().to_target()
         # cauterize doesn't have target information
         # altar fire doesn't have target information
 
@@ -410,8 +421,6 @@ class EncounterChecker:
             ]).check(f)
 
 
-
-
 # Heavenly Heel 1:
 # Both tanks kitchen sink
 
@@ -434,15 +443,8 @@ class EncounterChecker:
 reportCode = ReportCodes.JULY26.value
 fight_id = 43
 
-client = FFClient(CLIENT_ID, CLIENT_SECRET)
-report = Report(reportCode, client, Encounter.DSU)
-checker = EncounterChecker(report)
-checker.execute(fight_id)
+# client = FFClient(CLIENT_ID, CLIENT_SECRET)
+# report = Report(reportCode, client, Encounter.DSU)
+# checker = FightCheckDsu(report)
+# checker.execute(fight_id)
 
-# with open('test.json', 'w') as f:
-#     x = report.filter("inCategory('auras') = true", fight_id)
-#     x.named().write(f)
-#     y = report.filter("ability.name='final chorus'", fight_id)
-#     y.named().print()
-
-# print(len(x))

@@ -46,26 +46,6 @@ query CombatantInfo ($reportCode: String!, $startTime: Float, $endTime: Float, $
 }
 """
 
-Q_HEALING_AURAS = """
-query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
-    rateLimitData {
-        limitPerHour
-        pointsSpentThisHour
-    }
-    reportData {
-        report(code: $reportCode) {
-            auras: events(limit: 10000, dataType: Buffs, # hostilityType: Enemies,
-                startTime: $startTime, endTime: $endTime,
-                filterExpression: "inCategory('auras')=true AND inCategory('healing')=true AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
-                fightIDs: $fightIDs) {
-                data
-                nextPageTimestamp
-            }
-        }
-    }
-}
-"""
-
 def require_auras(func):
     '''Decorator that gets auras for a fight if needed before the function'''
     def ensured(*args, **kwargs):
@@ -73,7 +53,7 @@ def require_auras(func):
         event = args[1]
         fight_id = event.fight
         if fight_id not in self.auras:
-            fight = self._report.get_fight(fight_id)
+            fight = self._report.fight(fight_id)
             auras = self._fetch_combatant_info(fight) + \
                 self._fetch_auras(fight)
 
@@ -95,43 +75,26 @@ class AuraModel:
 
     def _fetch_combatant_info(self, fight: Fight) -> EventList:
         """convert prepull buffs into apply events"""
-        res = self._client.q(Q_COMBATANT_INFO, params={
-            'reportCode': self.code,
-            'startTime': fight.start_time,
-            'endTime': fight.end_time,
-            'fightIDs': [fight.i]})
-        combatant_info = res['reportData']['report']['info']['data']
-
+        combatant_info = self._report.events(fight.i).types("combatantinfo")
         apply_events = list()
         for combatant in combatant_info:
-            for aura in combatant['auras']:
+            for aura in combatant.auras:
                 apply_events.append(
                     Event({
-                    'timestamp': combatant['timestamp'],
+                    'timestamp': combatant.time,
                     'type': 'applybuff',
-                    'sourceID': combatant['sourceID'],
-                    'targetID': combatant['sourceID'],
+                    'sourceID': combatant.source,
+                    'targetID': combatant.source,
                     'fight': fight.i,
                     'abilityGameID': aura['ability'],
                     'stacks': aura['stacks'],
                     'duration': fight.end_time-fight.start_time
                 }))
-
         return EventList(apply_events, self._report)
 
     def _fetch_auras(self, fight: Fight) -> EventList:
-        all_events = list()
-        start_time = fight.start_time
-        while start_time:
-            res = self._client.q(Q_AURAS, params={
-                'reportCode': self.code,
-                'startTime': start_time, 
-                'endTime': fight.end_time,
-                'fightIDs': [fight.i]})
-            events = res['reportData']['report']['auras']
-            all_events += [Event(e) for e in events['data']]
-            start_time = events['nextPageTimestamp']
-        return EventList(all_events, self._report)
+        return self._report.events(fight.i).types([
+            'applybuff','applydebuff','removebuff','removedebuff'])
 
     @require_auras
     def applied_at(self, event: Event) -> EventList:
@@ -162,13 +125,13 @@ class AuraModel:
             if named is False:
                 ret.setdefault(e.target, list()).append(e.abilityGameID)
             else:
-                ret.setdefault(r.get_actor_name(e.target), list()).append(r.get_ability_name(e.abilityGameID))
+                ret.setdefault(r.get_actor(e.target).name, list()).append(r.get_ability(e.abilityGameID))
 
         return ret
 
     def aura(self, aura_name: str, fight_id: int) -> EventList:
         """All occurences of an aura, returning the list of apply events"""
-        ability_ids = [*map(lambda x: x.i, self._report.get_ability(aura_name))]
+        ability_ids = self._report.get_ability(aura_name)
 
         auras = self.auras[fight_id]
         auras = [e for e in auras if e.abilityGameID in ability_ids and e.type_ in self.APPLIES]
@@ -176,7 +139,7 @@ class AuraModel:
 
     def aura_on(self, aura_name: str, fight_id: int) -> list[str]:
         """List of targets of an aura"""
-        targets = map(lambda x: self._report.get_actor_name(x.target), self.aura(aura_name, fight_id))
+        targets = map(lambda x: self._report.get_actor(x.target).name, self.aura(aura_name, fight_id))
         return list(targets)
 
 

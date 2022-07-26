@@ -42,8 +42,6 @@ class Event:
             'targetID': -1,
             'fight': fight})
 
-
-
 class EventList:
     """Wrapper around a list of events. Contains reference to report"""
     def __init__(self, ls: List[Event], report: Report) -> None:
@@ -58,35 +56,41 @@ class EventList:
     def to_list(self) -> List:
         return self._ls
 
-    def type_(self, type_str: str) -> EventList:
-        new_list = [e for e in self._ls if e.type_==type_str]
+    def types(self, types: str | list[str]) -> EventList:
+        if isinstance(types, str):
+            new_list = [e for e in self._ls if e.type_==types]
+        elif isinstance(types, list):
+            new_list = [e for e in self._ls if e.type_ in types]
+        else:
+            raise TypeError(f'needs str or list[str], got {types=}')
         return EventList(new_list, self._r)
 
-    def types(self, types: list(str)) -> EventList:
-        new_list = [e for e in self._ls if e.type_ in types]
-        return EventList(new_list, self._r)
-
-    def in_phase(self, phase: str) -> EventList:
-        new_list = [e for e in self._ls if self._r.pm.phase_name(e) == phase]
+    def in_phases(self, phases: str | list[str]) -> EventList:
+        if isinstance(phases, str):
+            new_list = [e for e in self._ls if self._r.pm.phase_name(e) == phases]
+        elif isinstance(phases, list):
+            new_list = [self.pm.in_phase(p) for p in phases]
+        else:
+            raise TypeError(f'needs str or list[str], got {phases=}')
         return EventList(new_list, self._r).sort_phase_time()
 
-    def in_phases(self, phases: List[str]) -> EventList:
-        new_list = [self.pm.in_phase(p) for p in phases]
-        return EventList(new_list, self._r)
-
-    def in_fight(self, fight_id: int) -> EventList:
-        new_list = [e for e in self._ls if e.fight==fight_id]
-        return EventList(new_list, self._r)
-
-    def in_fights(self, fight_ids: List[int]) -> EventList:
-        new_list = [e for e in self._ls if e.fight in fight_ids]
+    def in_fights(self, fight_ids: int | list[int]) -> EventList:
+        if isinstance(fight_ids, int):
+            new_list = [e for e in self._ls if e.fight==fight_ids]
+        elif isinstance(fight_ids, list):
+            new_list = [e for e in self._ls if e.fight in fight_ids]
+        else:
+            raise TypeError(f'needs int or list[int], got {fight_ids=}')
         return EventList(new_list, self._r)
 
     def ability(self, ability_name: str) -> EventList:
-        ability = self._r.get_ability(ability_name)
-        ability_ids = [a.i for a in ability]
-        new_list = [e for e in self._ls if e.abilityGameID in ability_ids]
+        ability_ids = self._r.get_ability(ability_name)
+        new_list = filter(lambda x: hasattr(x, 'abilityGameID'), self._ls)
+        new_list = [e for e in new_list if e.abilityGameID in ability_ids]
         return EventList(new_list, self._r)
+
+    def casts(self, ability_name: str):
+        return self.ability(ability_name).types("cast")
 
     def by(self, name: str) -> EventList:
         if type(self._ls[0].source) is int:
@@ -141,13 +145,13 @@ class EventList:
             new_event = Event(event.to_dict())
             new_list.append(new_event)
 
-            new_event.source = self._r.get_actor_name(event.source)
-            new_event.target = self._r.get_actor_name(event.target)
-            new_event.fighttime = event.time - self._r.get_fight(event.fight).start_time
+            new_event.source = self._r.get_actor(event.source).name
+            new_event.target = self._r.get_actor(event.target).name
+            new_event.fighttime = event.time - self._r.fight(event.fight).start_time
 
             try:
-                new_event.abilityGameID = self._r.get_ability_name(event.abilityGameID)
-                new_event.extraAbilityGameID = self._r.get_ability_name(event.extraAbilityGameID)
+                new_event.abilityGameID = self._r.get_ability(event.abilityGameID)
+                new_event.extraAbilityGameID = self._r.get_ability(event.extraAbilityGameID)
             except AttributeError:
                 continue
 
