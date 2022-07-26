@@ -23,3 +23,15 @@ class Guild(Enum):
 
 class User(Enum):
     KEVIN = 215343
+
+class ReportCodes(Enum):
+    JULY23 = "NvPKDTd3nfGF78Jp"
+    JULY26 = "Q6GnmtMY9y3NrBLz"
+    
+class Yoon(Enum):
+    JULY23 = 1540569628, '13:27', 1
+
+    def __init__(self, code: int, offset: str, fight_id: int) -> None:
+        self.code = code
+        self.offset = offset
+        self.fight_id = fight_id

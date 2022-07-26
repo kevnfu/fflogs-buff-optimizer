@@ -11,23 +11,7 @@ from enums import Encounter, Platform
 from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS
 from data import Event, EventList, Fight, Ability, Actor
 from phases import PhaseModelDsu
-
-def require_phase_model(func):
-    '''Decorator that sets the phase model if needed before the function'''
-    def ensured(*args, **kwargs):
-        self = args[0]
-        if self.pm is None:
-            match self.encounter:
-                case Encounter.DSU: 
-                    model = PhaseModelDsu
-                case Encounter.TEA:
-                    model = PhaseModelTea
-                case _:
-                    raise NotImplementedError(f'No phase model for {self.encounter}')
-
-        self.pm = model(self.code, self._client, self)
-        return func(*args, **kwargs)
-    return ensured
+from aura import AuraModel
 
 class Report:
     """Report for one type of encounter"""
@@ -35,8 +19,15 @@ class Report:
         self._client = client
         self.code = code
         self.encounter = encounter
-        self.pm = None # only loaded when needed
+        match self.encounter:
+            case Encounter.DSU: 
+                self.pm = PhaseModelDsu(self)
+            case Encounter.TEA:
+                self.pm = PhaseModelTea(self)
+            case _:
+                raise NotImplementedError(f'No phase model for {self.encounter}')
 
+        self.am = AuraModel(self)
         self.data = dict() # to be filled w/ individual calls
 
         self._fetch_master_data()
@@ -60,10 +51,10 @@ class Report:
             f.write(json.dumps(report['masterData']['abilities'], indent=4))
 
         self.actors = [Actor(a) for a in report['masterData']['actors']]
-        self.actors_by_id = {a.i: a for a in self.actors}
+        # self.actors_by_id = {a.i: a for a in self.actors}
 
         self.abilities = [Ability(a) for a in report['masterData']['abilities']]
-        self.abilities_by_id = {a.i: a for a in self.abilities}
+        # self.abilities_by_id = {a.i: a for a in self.abilities}
         # self.abilities_by_name = {a.name: a for a in self.abilities}
 
     def _fetch_all_fights(self) -> list(Fight):
@@ -71,6 +62,7 @@ class Report:
             'reportCode': self.code,
             'encounterID': self.encounter.value})
         report = res['reportData']['report']
+        report['fights']
         return {f['id']: Fight(f) for f in report['fights']}
         # self._fights_by_id = {f.i: f for f in self._fights}
 
@@ -91,7 +83,7 @@ class Report:
     # get child elements
     def get_fight(self, fight_id: int) -> Fight:
         """Returns fight from self._fights, or tries to get from server"""
-        if fight:=self._fights.get(fight_id):
+        if fight:=self._fights.get(fight_id, None):
             return fight
         elif fight:=self._fetch_fight(fight_id):
             self._fights[fight_id] = fight
@@ -108,13 +100,21 @@ class Report:
     def get_actor(self, name: str) -> list[Actor]:
         return [a for a in self.actors if a.name==name]
 
+    def get_actor_name(self, i: int) -> str:
+        return next(filter(lambda a: a.i==i, self.actors)).name
+
     def get_actor_ids(self, name: str) -> list[int]:
         return [a.i for a in self.actors if a.name==name]
 
-    def get_ability(self, name) -> Ability:
-        return next(filter(lambda a: a.name==name, self.abilities))
+    def get_ability(self, name: str) -> list[Ability]:
+        return list(filter(lambda a: a.name==name, self.abilities))
 
-    @require_phase_model # EventList can access phase events
+    def get_ability_name(self, i: int) -> str:
+        return next(filter(lambda a: a.i==i, self.abilities)).name
+
+    def get_phase_model(self) -> PhaseModel:
+        return self.pm
+
     def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
         start_time = self.first_fight().start_time
         all_events = []
@@ -132,20 +132,22 @@ class Report:
 
         return EventList(all_events, self)
 
+    def filter(self, filter_str: str, fight_id: int=None) -> EventList:
+        if fight_id:
+            return self._fetch_events(filter_str, [fight_id])
+        else:
+            return self._fetch_events(filter_str)
+
     def deaths(self) -> EventList:
         return self._fetch_events("inCategory('deaths') = true")
 
-    def casts(self, ability_name: str, actor_name: str='') -> EventList:
-        filter_str = f"type='cast' AND ability.name='{ability_name}'"
-        if actor_name:
-            filter_str += f" AND source.name='{actor_name}'"
-        return self._fetch_events(filter_str)
+    def casts(self, ability_name: str, *args) -> EventList:
+        filter_str = f'type="cast" AND ability.name="{ability_name}"'
+        return self.filter(filter_str, *args)
 
-    def actions(self, ability_name: str, actor_name: str='') -> EventList:
-        filter_str = f"ability.name='{ability_name}'"
-        if actor_name:
-            filter_str += f" AND source.name='{actor_name}'"
-        return self._fetch_events(filter_str)
+    def actions(self, ability_name: str, *args) -> EventList:
+        filter_str = f'ability.name="{ability_name}"'
+        return self.filter(filter_str, *args)
 
     def dummy_downs(self) -> EventList:
         return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
@@ -156,8 +158,7 @@ class Report:
     def lose_aura(self):
         pass
 
-    @require_phase_model
-    def output_events(self, events: list[Event], offset: int=0, separator: str='\n') -> None:
+    def links(self, events: list[Event], offset: int=0, separator: str='\n') -> None:
         ls = list()
         for event in events:
             phase = self.pm.phase_name(event)
@@ -166,7 +167,6 @@ class Report:
             ls.append(f'{self._to_output(time)} {event.fight}{phase}@{phase_time:.0f}s')
         print(separator.join(ls))
 
-    @require_phase_model
     def print_pull_times(self) -> Report:
         """Print start time for all fights"""
         for fight in self._fights.values():
@@ -176,26 +176,25 @@ class Report:
             print(output)
         return self
 
-    @require_phase_model
     def print_phase_times(self, phases: list[str], offset=0) -> Report:
         """Takes a list of phase names and outputs the start of those phases"""
-        for phase_event in self.phase_starts(phases):
+        for phase_event in self.pm.phase_starts(phases):
             phase = self.pm.phase_name(phase_event)
-            time = self._relative_time(phase_event.time)
-            fightID = phase_event.fight
+            time = self._relative_time(phase_event.time + offset)
+            fight_id = phase_event.fight
 
             output = f'{self._to_output(time)} '
-            output += f'Fight{fightID}:{100 - self.get_fight(fightID).percent:.2f}%:{phase}'
+            output += f'Fight{fight_id}:{100 - self.get_fight(fight_id).percent:.2f}%:{phase}'
             print(output)
         return self
 
     # outputs:
-    def set_video_offset_time(self, mmss: str, fightID: int) -> Report:
-        """Put in timestamp of video at Fight fightID"""
+    def set_video_offset_time(self, mmss: str, fight_id: int) -> Report:
+        """Put in timestamp of video at Fight fight_id"""
         minutes, seconds = mmss.split(':')
         ms = int(minutes)*1000*60 + int(seconds)*1000
 
-        fight = self.get_fight(fightID)
+        fight = self.get_fight(fight_id)
         self.offset = ms - fight.start_time
         return self
 
@@ -231,7 +230,8 @@ class Report:
             case Platform.YOUTUBE:
                 return self._youtube_time(time)
             case Platform.TWITCH:
-                assert self.output_code is not None
+                if self.output_code is None:
+                    raise ValueError('No twitch video code.')
                 return self._twitch_url(time, self.output_code)
             case _:
                 raise ValueError('Not a supported platform')

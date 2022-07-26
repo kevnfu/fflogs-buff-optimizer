@@ -15,9 +15,9 @@ query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs
     }
     reportData {
         report(code: $reportCode) {
-            auras: events(limit: 10000, dataType: Buffs, # hostilityType: Enemies,
+            auras: events(limit: 10000, # hostilityType: Enemies,
                 startTime: $startTime, endTime: $endTime,
-                filterExpression: "inCategory('auras')=true AND inCategory('healing')=false AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
+                filterExpression: "inCategory('auras')=true AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
                 fightIDs: $fightIDs) {
                 data
                 nextPageTimestamp
@@ -77,20 +77,21 @@ def require_auras(func):
             auras = self._fetch_combatant_info(fight) + \
                 self._fetch_auras(fight)
 
-            with open('test.json', 'w') as f:
-                auras.named().write(f)
+            # with open('test.json', 'w') as f:
+            #     auras.named().write(f)
 
             self.auras[fight_id] = reversed(auras)
         return func(*args, **kwargs)
     return ensured
 
 class AuraModel:
-
-    def __init__(self, client: FFClient, report: Report):
+    """Outputs active buffs/debuffs"""
+    def __init__(self, report: Report):
         self.code = report.code
         self._report = report
-        self._client = client
+        self._client = report._client
         self.auras = dict() # fightID: aura mapping
+        self.APPLIES = ['applybuff','applydebuff']
 
     def _fetch_combatant_info(self, fight: Fight) -> EventList:
         """convert prepull buffs into apply events"""
@@ -133,9 +134,9 @@ class AuraModel:
         return EventList(all_events, self._report)
 
     @require_auras
-    def all_on_event(self, event: Event) -> EventList:
+    def applied_at(self, event: Event) -> EventList:
         """All auras active on all entities at the time of an event, returning the list of apply events"""
-        auras = self.auras[event.fight]
+        auras = self.auras[event.fight] # auras is in reversed chronological order
 
         # get all preceding events
         auras = auras.before(event)
@@ -144,19 +145,39 @@ class AuraModel:
         seen_auras = set()
         most_recent = list()
         for a in auras:
-            if k:=(a.target, a.etc['abilityGameID']) not in seen_auras:
+            if (k:=(a.target, a.abilityGameID)) not in seen_auras:
                 seen_auras.add(k)
                 most_recent.append(a)
 
-        return EventList(reversed(most_recent), self._report)
+        # only apply events
+        
+        most_recent = [e for e in most_recent if e.type_ in self.APPLIES]
+        return EventList(list(reversed(most_recent)), self._report)
 
-    def all_on(self, event: Event) -> dict(int, int):
-        """All auras active on all entities at the time of an event, returning a targetID:[abilityID] dict"""
-        pass
+    def active_at(self, event: Event, *, named=False) -> dict(int, list[int]) | dict(str, list[str]):
+        """All auras active on all entities at the time of an event, returning an actor.id:list[ability.id] dict"""
+        ret = dict()
+        r = self._report
+        for e in self.applied_at(event):
+            if named is False:
+                ret.setdefault(e.target, list()).append(e.abilityGameID)
+            else:
+                ret.setdefault(r.get_actor_name(e.target), list()).append(r.get_ability_name(e.abilityGameID))
 
-    def aura(self, aura: int, fight_id: int) -> EventList:
+        return ret
+
+    def aura(self, aura_name: str, fight_id: int) -> EventList:
         """All occurences of an aura, returning the list of apply events"""
-        pass
+        ability_ids = [*map(lambda x: x.i, self._report.get_ability(aura_name))]
+
+        auras = self.auras[fight_id]
+        auras = [e for e in auras if e.abilityGameID in ability_ids and e.type_ in self.APPLIES]
+        return EventList(list(reversed(auras)), self._report)
+
+    def aura_on(self, aura_name: str, fight_id: int) -> list[str]:
+        """List of targets of an aura"""
+        targets = map(lambda x: self._report.get_actor_name(x.target), self.aura(aura_name, fight_id))
+        return list(targets)
 
 
 

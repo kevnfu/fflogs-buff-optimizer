@@ -57,6 +57,7 @@ query Fights ($reportCode: String!, $encounterID: Int, $fightIDs: [Int]) {
                 endTime
                 fightPercentage
                 lastPhaseAsAbsoluteIndex
+                friendlyPlayers
             }
         }
     }
@@ -83,6 +84,34 @@ query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTi
     }
 }
 """
+
+Q_TIMELINE = """
+query Timeline ($reportCode: String!, $encounterID: Int!, $startTime: Float, $endTime: Float){
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            deaths: events(dataType: Deaths, hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
+                startTime: $startTime, endTime: $endTime) {
+                data
+                # nextPageTimestamp
+            }
+            targetable: events(hostilityType: Enemies, limit: 10000,
+                encounterID: $encounterID,
+                filterExpression: "type='targetabilityupdate'",
+                startTime: $startTime, endTime: $endTime) {
+                data
+                # nextPageTimestamp
+            }
+        }
+    }
+}
+"""
+
+
 
 Q_ENCOUNTER = """
 query {{

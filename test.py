@@ -4,70 +4,53 @@ import json
 
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
-from enums import Encounter, Platform
+from enums import Encounter, Platform, ReportCodes
 from report import Report
 from data import Event
 from aura import AuraModel
 
+from queries import Q_EVENTS
 
-def print_a(report):
-    # for my video
+
+def print_a():
+    reportCode = "Tm8K39AaBpYwD4MR"
+
+    client = FFClient(CLIENT_ID, CLIENT_SECRET)
+    report = Report(reportCode, client, Encounter.DSU)
+    # print_a(report)
+
     # anna
-    report.set_video_offset_time('28:57', 1) \
-        .set_output_type(Platform.TWITCH, '1535990224')
+    report.set_video_offset_time('19:17', 2)\
+        .set_output_type(Platform.TWITCH, '1537996395')\
 
-    # report.deaths().to("Mayu Sakuma").print()
-
-    # yoon 
-    report.set_video_offset_time('1:06', 1)\
-        .set_output_type(Platform.TWITCH, '1536014750')\
-        .casts('Standard Step').in_phases(['P5']).print(-5000)
+    report.casts('Final Chorus').in_fight(33).links(-10000)
 
 # reportCode = "GhQRrD2kK8yB379d" # top ast clear pull 36
 # fightID = 36
 # reportCode = "PkaMGFgDf7hBWn2p" # mira clear pull 62
 # fightID = 62
 
-reportCode = "19M43vwFh6GtAcCp"
+reportCode = ReportCodes.JULY26.value
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
-# print_a(report)
 
-# report.set_video_offset_time('1:06', 1)\
-#     .set_output_type(Platform.TWITCH, '1536014750')\
+report.set_video_offset_time('13:27', 1)\
+    .set_output_type(Platform.TWITCH, 1540569628)
 
-# with open('test.json', 'w') as f:
-#     report.print_pull_times()
-#     report.actions("Ancient Quaga").in_phase("P2").named().write(f).print()
+# report.print_phase_times(['P3'], 60000)
 
-am = AuraModel(client, report)
-aura_list = am.all_on_event(Event.from_time(9167232, 25))
 
-print(aura_list)
-# events = report._fetch_events('', 25)
+x = report._fetch_events('', 43)
+print(len(x))
 
-# with open('test.json', 'w') as f:
-#     aura_list.named().write(f)
 
-# Q_TABLE = """
-# query Graph {
-#     rateLimitData {
-#         limitPerHour
-#         pointsSpentThisHour
-#     }
-#     reportData {
-#         report(code: "TwzV7fmdhpA1gykF") {
-#             table( 
-#                 startTime: 0, endTime: 9999999999,
-#                 encounterID: 1065,
-#                 filterExpression: "ability.name='Ancient Quaga'",
-#                 fightIDs: [30])
-#         }
-#     }
-# }
-# """
+# res = client.q(Q_EVENTS, params={
+#     'reportCode': reportCode,
+#     'encounterID': Encounter.DSU.value,
+#     'startTime': 0, 
+#     'endTime': 999999999999999999999999999,
+#     'filter': "ability.name='ascalon's might'",
+#     'fightIDs': 35})
 
-# res = client.q(Q_TABLE, {})
-
-# print(json.dumps(res, indent=4))
+# print(res)

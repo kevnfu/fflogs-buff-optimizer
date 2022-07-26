@@ -10,7 +10,6 @@ class Event:
     source: int
     target: int
     fight: int
-    etc: Dict[str, Any]
 
     def __init__(self, data: Dict[str, Any]) -> None:
         self.time = data.pop('timestamp')
@@ -18,19 +17,21 @@ class Event:
         self.source = data.pop('sourceID', -1)
         self.target = data.pop('targetID', -1)
         self.fight = data.pop('fight')
-        self.etc = data
+        self.__dict__.update(data) 
 
     def __str__(self):
         return str(json.dumps(self.to_dict(), indent=2))
 
     def to_dict(self):
+        renamed = ['time', 'type_', 'source', 'target']
+        etc = {k:v for k,v in self.__dict__.items() if k not in renamed}
+
         return {
             'timestamp':self.time,
             'type': self.type_, 
             'sourceID': self.source,
             'targetID': self.target,
-            'fight': self.fight,
-            } | self.etc
+            } | etc
 
     @classmethod
     def from_time(cls, time: int, fight: int=-1) -> Event:
@@ -67,7 +68,7 @@ class EventList:
 
     def in_phase(self, phase: str) -> EventList:
         new_list = [e for e in self._ls if self._r.pm.phase_name(e) == phase]
-        return EventList(new_list, self._r).order_by_phase_time()
+        return EventList(new_list, self._r).sort_phase_time()
 
     def in_phases(self, phases: List[str]) -> EventList:
         new_list = [self.pm.in_phase(p) for p in phases]
@@ -79,6 +80,12 @@ class EventList:
 
     def in_fights(self, fight_ids: List[int]) -> EventList:
         new_list = [e for e in self._ls if e.fight in fight_ids]
+        return EventList(new_list, self._r)
+
+    def ability(self, ability_name: str) -> EventList:
+        ability = self._r.get_ability(ability_name)
+        ability_ids = [a.i for a in ability]
+        new_list = [e for e in self._ls if e.abilityGameID in ability_ids]
         return EventList(new_list, self._r)
 
     def by(self, name: str) -> EventList:
@@ -98,40 +105,53 @@ class EventList:
         return EventList(new_list, self._r)
 
     def before(self, event: Event) -> EventList:
-        self._ls = [e for e in self._ls if e.time <= event.time]
-        return self
+        new_list = [e for e in self._ls if e.time <= event.time]
+        return EventList(new_list, self._r)
 
     def after(self, event: Event) -> EventList:
-        self._ls = [e for e in self._ls if e.time >= event.time]
-        return self
+        new_list = [e for e in self._ls if e.time >= event.time]
+        return EventList(new_list, self._r)
 
-    def order_by_time(self, /, reverse=False) -> EventList:
+    def to_source(self) -> list(int | str):
+        return [e.source for e in self._ls]
+
+    def to_target(self) ->list(int | str):
+        return [e.target for e in self._ls]
+
+    def sort_time(self, *, reverse=False) -> EventList:
         self._ls.sort(key=lambda i: i.time, reverse=reverse)
         return self
 
-    def order_by_phase(self) -> EventList:
+    def sort_phase(self) -> EventList:
         self._ls.sort(key=lambda i: self._r.pm.phase(i))
         return self
 
-    def order_by_phase_time(self) -> EventList:
+    def sort_phase_time(self) -> EventList:
         self._ls.sort(key=lambda i: (self._r.pm.phase_time(i)))
         return self
 
-    def output(self, *args) -> EventList:
-        self._r.output_events(self, *args)
+    def links(self, *args) -> EventList:
+        self._r.links(self, *args)
         return self
 
     def named(self) -> EventList:
+        new_list = list()
         for event in self._ls:
-            event.source = self._r.actors_by_id[event.source].name
-            event.target = self._r.actors_by_id[event.target].name
-            event.etc['fighttime'] = event.time - self._r.get_fight(event.fight).start_time
+            # create new
+            new_event = Event(event.to_dict())
+            new_list.append(new_event)
 
-            if 'abilityGameID' in event.etc:
-                event.etc['abilityGameID'] = self._r.abilities_by_id[event.etc['abilityGameID']].name
-            if 'extraAbilityGameID' in event.etc:
-                event.etc['extraAbilityGameID'] = self._r.abilities_by_id[event.etc['extraAbilityGameID']].name
-        return self
+            new_event.source = self._r.get_actor_name(event.source)
+            new_event.target = self._r.get_actor_name(event.target)
+            new_event.fighttime = event.time - self._r.get_fight(event.fight).start_time
+
+            try:
+                new_event.abilityGameID = self._r.get_ability_name(event.abilityGameID)
+                new_event.extraAbilityGameID = self._r.get_ability_name(event.extraAbilityGameID)
+            except AttributeError:
+                continue
+
+        return EventList(new_list, self._r)
 
     def print(self) -> EventList:
         for e in self._ls:
@@ -159,8 +179,17 @@ class EventList:
         return self._ls.__len__()
 
     def __reversed__(self):
-        return self.order_by_time(reverse=True)
+        self._ls = list(reversed(self._ls))
+        return self 
 
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return EventList(self._ls[index], self._r)
+        else:
+            return self._ls.__getitem__(index)
+
+    def __setitem__(self, index, data):
+        self._ls.__setitem__(index, data)
 
 @dataclass
 class Actor:
@@ -193,7 +222,7 @@ class Fight:
     end_time: int
     percent: float
     last_phase: int
-    # report: Report
+    players: list[int]
 
     def __init__(self, data: Dict[str, Any]) -> None:
         self.i=data['id']
@@ -202,4 +231,17 @@ class Fight:
         self.end_time=data['endTime']
         self.percent=data['fightPercentage']
         self.last_phase=data['lastPhaseAsAbsoluteIndex']
-        # self.report=report
+        self.players=data['friendlyPlayers']
+
+    def __str__(self):
+        return str(json.dumps(self.to_dict(), indent=2))
+
+    def to_dict(self):
+        return {
+            'id': self.i,
+            'encounter': self.encounter,
+            'startTime': self.start_time,
+            'endTime': self.end_time,
+            'fightPercentage': self.percent,
+            'lastPhaseAsAbsoluteIndex': self.last_phase,
+            'friendlyPlayers': self.players}

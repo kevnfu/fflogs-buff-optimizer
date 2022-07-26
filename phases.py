@@ -5,34 +5,10 @@ import itertools
 import json
 
 from enums import Encounter
-from queries import Q_FIGHTS
+from queries import Q_FIGHTS, Q_TIMELINE
 from data import Event, Fight
 
-Q_TIMELINE = """
-query Timeline ($reportCode: String!, $encounterID: Int!, $startTime: Float, $endTime: Float){
-    rateLimitData {
-        limitPerHour
-        pointsSpentThisHour
-    }
-    reportData {
-        report(code: $reportCode) {
-            deaths: events(dataType: Deaths, hostilityType: Enemies, limit: 10000,
-                encounterID: $encounterID,
-                startTime: $startTime, endTime: $endTime) {
-                data
-                # nextPageTimestamp
-            }
-            targetable: events(hostilityType: Enemies, limit: 10000,
-                encounterID: $encounterID,
-                filterExpression: "type='targetabilityupdate'",
-                startTime: $startTime, endTime: $endTime) {
-                data
-                # nextPageTimestamp
-            }
-        }
-    }
-}
-"""
+
 
 def require_timeline(func):
     '''Decorator that calls build on the model if needed before the function'''
@@ -41,7 +17,7 @@ def require_timeline(func):
         event = args[1]
         fight_id = event.fight
         if fight_id not in self.timelines:
-            self.timelines[fight_id] = self.build(fight_id)
+            self.timelines[fight_id] = self._build(fight_id)
 
         return func(*args, **kwargs)
     return ensured
@@ -54,12 +30,12 @@ class PhaseModel:
     The first event is the start of the first phase, the second event is the start of the second, etc.
     """
 
-    def build(self, fight_id: int) -> list[Event]:
+    def _build(self, fight_id: int) -> list[Event]:
         """Creates timeline for one fight"""
         raise NotImplementedError('Use subclass of PhaseReport')
 
-    def __init__(self, code: str, client: FFClient, report: Report) -> None:
-        self.code = code
+    def __init__(self, report: Report) -> None:
+        self.code = report.code
         self._report = report
         self.encounter = report.encounter
         self._client = report._client
@@ -67,7 +43,7 @@ class PhaseModel:
         # override
         self.PHASE_NAMES = None
 
-        # dict[fight_id: timeline], populated by build()
+        # dict[fight_id: timeline], populated by _build()
         self.timelines = dict() 
 
 
@@ -79,6 +55,10 @@ class PhaseModel:
             'startTime': fight.start_time, 
             'endTime': fight.end_time})
         return res
+
+    def _build_all(self) -> None:
+        for fight_id in self._report._fights.keys():
+            self.timelines[fight_id] = self._build(fight_id)
 
     @require_timeline
     def phase(self, event: Event) -> int:
@@ -103,10 +83,13 @@ class PhaseModel:
 
     def phase_starts(self, phases: list[str]) -> list[Event]:
         """Returns a list of events corresponding to the start of phase_index phases"""
+        self._build_all()
         phase_indexes = [self._to_phase_index(p) for p in phases]
+
         phase_events = list()
         for timeline in self.timelines.values():
             phase_events += [timeline[i] for i in phase_indexes if i < len(timeline)]
+        
         return phase_events
 
     def valid_phase(self, phase: str) -> bool:
@@ -120,15 +103,15 @@ class PhaseModel:
 
 
 class PhaseModelDsu(PhaseModel):
-    def __init__(self, code: str, client: FFClient, report: Report):
+    def __init__(self, report: Report):
         if report.encounter is not Encounter.DSU:
             raise TypeError(f'Using DSU model for {encounter}')
 
-        super().__init__(code, client, report)
+        super().__init__(report)
 
         self.PHASE_NAMES = ["P1", "P2", "P3", "P4", "I", "P5", "P6", "P7"]
 
-    def build(self, fight_id: int) -> list[Event]:
+    def _build(self, fight_id: int) -> list[Event]:
         EVENT_INDEX = [
             2, # Thordan Death
             4, # Nidhogg Death
@@ -137,7 +120,7 @@ class PhaseModelDsu(PhaseModel):
             16, # Dragons targetable
             26,] # Dragon-King thordan targetable
 
-        fight = self.report.get_fight(fight_id)
+        fight = self._report.get_fight(fight_id)
 
         # special case fight ended phase 1; timeline is a single event: fight start
         if fight.last_phase == 0: # Fight ended phase 1
@@ -149,7 +132,7 @@ class PhaseModelDsu(PhaseModel):
 
         # Events for this fight is only based on deaths and boss targetables.
         targetable = map(Event, report['targetable']['data'])
-        targetable = filter(lambda e: e.etc['targetable']==True, targetable)
+        targetable = filter(lambda e: e.targetable==True, targetable)
         deaths = map(Event, report['deaths']['data'])
 
         # Join both types of events and order chronologically
