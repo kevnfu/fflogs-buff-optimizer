@@ -28,10 +28,14 @@ class ReportCodes(Enum):
     JULY23 = "NvPKDTd3nfGF78Jp"
     JULY26 = "Q6GnmtMY9y3NrBLz"
     
-class Yoon(Enum):
-    JULY23 = 1540569628, '13:27', 1
-
+class Vod(Enum):
     def __init__(self, code: int, offset: str, fight_id: int) -> None:
         self.code = code
         self.offset = offset
         self.fight_id = fight_id
+
+class Yoon(Vod):
+    JULY23 = 1540569628, '13:27', 1
+
+class Anna(Vod):
+    JULY26 = 1542923962, '03:32', 1

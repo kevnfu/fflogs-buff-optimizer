@@ -140,7 +140,7 @@ class FightCheckDsu(FightCheck):
         self.fight = self._r.fight(fight_id)
         self.events = self._r.events(fight_id)
         # whether to include fight info
-        self.mit_only = True
+        self.mit_only = False
 
         f = self._file
 
@@ -604,12 +604,11 @@ class FightCheckDsu(FightCheck):
 # Copy paste from Gigaflare's edge 1
 
 reportCode = ReportCodes.JULY26.value
-fight_id = 34
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
 with open('checker.txt', 'w') as f:
     checker = FightCheckDsu(report, f)
-    # checker.run(36)
-    for x in range(1,44):
-        checker.run(x)
+    checker.run(43)
+    # for x in range(44):
+        # checker.run(x)

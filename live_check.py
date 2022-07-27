@@ -1,6 +1,6 @@
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
-from enums import Encounter, Platform, ReportCodes
+from enums import Encounter, Platform, ReportCodes,
 from report import Report
 from fightcheck import FightCheckDsu
 
@@ -11,11 +11,12 @@ report = Report(reportCode, client, Encounter.DSU)
 
 checker = FightCheckDsu(report)
 
-current_fight = 2
-while (line:=input('Fight#?')) != 'x':
+current_fight = 1
+while (line:=input(f'Fight {current_fight}?')) != 'x':
     if line.isdigit():
         current_fight = int(line)
 
-    if report.fight(fight_id) is not None:
-        checker.run(current_fight)
-        print('Done')
+    if checker.run(current_fight):
+        print(f'Finished {current_fight=}')
+    else:
+        print(f'failed')

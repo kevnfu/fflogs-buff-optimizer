@@ -134,49 +134,62 @@ class Report:
 
         return EventList(all_events, self)
 
-    def events(self, fight_id: int) -> EventList:
+    def _fetch_all_events_all_fights(self) -> None:
+        for fight_id in self._fights.keys():
+            if fight_id not in self._events:
+                self._events[fight_id] = self._fetch_all_events(fight_id)
+
+    def events(self, fight_id: int=None) -> EventList:
+        if fight_id is None:
+            self._fetch_all_events_all_fights()
+            ret = EventList(list(), self)
+            for event_list in self._events.values():
+                ret += event_list
+            return ret
+
         if self.fight(fight_id) is None:
             return None
         if fight_id not in self._events:
             self._events[fight_id] = self._fetch_all_events(fight_id)
-        return EventList(self._events[fight_id], self)
+        return self._events[fight_id]
 
-    # def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
-    #     start_time = self.first_fight().start_time
-    #     all_events = []
-    #     while start_time:
-    #         res = self._client.q(Q_EVENTS, params={
-    #             'reportCode': self.code,
-    #             'encounterID': self.encounter.value,
-    #             'startTime': start_time,
-    #             'endTime': self.last_fight().end_time,
-    #             'filter': filter_expression,
-    #             'fightIDs': fight_ids})
-    #         events = res['reportData']['report']['events']
-    #         all_events += [*map(Event, events['data'])]
-    #         start_time = events['nextPageTimestamp']
+    def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
+        start_time = self.first_fight().start_time
+        all_events = []
+        while start_time:
+            res = self._client.q(Q_EVENTS, params={
+                'reportCode': self.code,
+                'encounterID': self.encounter.value,
+                'startTime': start_time,
+                'endTime': self.last_fight().end_time,
+                'filter': filter_expression,
+                'fightIDs': fight_ids})
+            events = res['reportData']['report']['events']
+            all_events += [*map(Event, events['data'])]
+            start_time = events['nextPageTimestamp']
 
-    #     return EventList(all_events, self)
+        return EventList(all_events, self)
 
-    # def filter(self, filter_str: str, fight_id: int=None) -> EventList:
-    #     if fight_id:
-    #         return self._fetch_events(filter_str, [fight_id])
-    #     else:
-    #         return self._fetch_events(filter_str)
+    def filter(self, filter_str: str, *args) -> EventList:
+        return self._fetch_events(filter_str, *args)
 
-    # def deaths(self, fight_id: int) -> EventList:
-    #     return self._fetch_events("inCategory('deaths') = true", [fight_id])
+    def deaths(self, *args) -> EventList:
+        return self.filter("inCategory('deaths') = true", *args)
 
-    # def casts(self, ability_name: str, *args) -> EventList:
-    #     filter_str = f'type="cast" AND ability.name="{ability_name}"'
-    #     return self.filter(filter_str, *args)
+    def casts(self, ability_name: str, *args) -> EventList:
+        filter_str = f'type="cast" AND ability.name="{ability_name}"'
+        return self.filter(filter_str, *args)
 
-    # def actions(self, ability_name: str, *args) -> EventList:
-    #     filter_str = f'ability.name="{ability_name}"'
-    #     return self.filter(filter_str, *args)
+    def types(self, type_name: str, *args) -> EventList:
+        filter_str = f'type="{type_name}"'
+        return self.filter(filter_str, *args)
 
-    # def dummy_downs(self) -> EventList:
-    #     return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
+    def abilities(self, ability_name: str, *args) -> EventList:
+        filter_str = f'ability.name="{ability_name}"'
+        return self.filter(filter_str, *args)
+
+    def dummy_downs(self) -> EventList:
+        return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
 
     def links(self, events: EventList, offset: int=0, separator: str='\n') -> None:
         ls = list()

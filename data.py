@@ -48,11 +48,6 @@ class EventList:
         self._r = report
         self._ls = ls
 
-    def __add__(self, other: EventList) -> EventList:
-        if self._r is not other._r:
-            raise ValueError('Attempting to add events from different reports')
-        return EventList(self._ls + other._ls, self._r)
-
     def to_list(self) -> List:
         return self._ls
 
@@ -102,6 +97,12 @@ class EventList:
             new_list = [e for e in self._ls if e.source is name]
         return EventList(new_list, self._r)
 
+    def by_friendly(self) -> EventList:
+        pass
+
+    def by_hostile(self) -> EventList:
+        pass
+
     def to(self, name: str) -> EventList:
         if len(self)==0:
             return EventList(list(), self._r)
@@ -111,6 +112,12 @@ class EventList:
         else:
             new_list = [e for e in self._ls if e.target==name]
         return EventList(new_list, self._r)
+
+    def to_friendly(self) -> EventList:
+        pass
+
+    def to_hostile(self) -> EventList:
+        pass
 
     def before(self, event: Event) -> EventList:
         new_list = [e for e in self._ls if e.time <= event.time]
@@ -198,6 +205,11 @@ class EventList:
 
     def __setitem__(self, index, data):
         self._ls.__setitem__(index, data)
+
+    def __add__(self, other: EventList) -> EventList:
+        if self._r is not other._r:
+            raise ValueError('Attempting to add events from different reports')
+        return EventList(self._ls + other._ls, self._r)
 
 @dataclass
 class Actor:
