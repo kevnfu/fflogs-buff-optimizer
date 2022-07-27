@@ -1,8 +1,9 @@
 from __future__ import annotations
 from typing import Any
 
-from enums import Encounter, ReportCodes, Yoon
+from collections import Counter
 
+from enums import Encounter, ReportCodes, Yoon
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
 from report import Report
@@ -15,6 +16,7 @@ class FightCheck:
 
         def __init__(self, fc: FightCheck) -> None:
             self.fc = fc
+            self._file = fc._file
             self._r = fc._r
             self._am = fc._am
             self.fight = fc.fight
@@ -59,12 +61,13 @@ class FightCheck:
                 self.players = self._r.get_actor_ids(player)
             return self
 
-        def check(self, f: File) -> None:
+        def check(self) -> None:
+            f = self._file
             try:
                 time = (self.event.time - self.fight.start_time)/1000
                 seconds = time % 60
                 minutes = int(time / 60)
-                f.write(f'{self.event_name.upper()} @ {minutes:02d}:{seconds:03.1f}')
+                f.write(f'{self.event_name.upper()} @ {minutes:02d}:{seconds:04.1f}')
             except AttributeError:
                 f.write(f'No event\n')
                 return
@@ -93,18 +96,30 @@ class FightCheck:
             # fights include some random things as friendly players
             missing.pop('Multiple Players', None)
             missing.pop('Limit Break', None)
+            missing.pop('Tick Effect', None)
 
-            if sum([len(v) for v in missing.values()])==0:
+            counter = Counter()
+            for v in missing.values():
+                counter.update(v)
+
+            if len(counter)==0:
                 f.write(' Good!\n')
             else:
+                all_missing = set([k for k,v in counter.items() if v>=8])
+                if all_missing:
+                    f.write(f'\n!!! {all_missing=} !!!')
+
                 for k, v in missing.items():
-                    if v:
-                        f.write(f'\n{v} missing from {k}')
+                    if individual_missing := v - all_missing:
+                        f.write(f'\n{individual_missing} missing from {k}')
                 f.write('\n')
 
-    def __init__(self, report: Report):
+    def __init__(self, report: Report, file: File, *, mit_only=False) -> None:
         self._r = report
+        self._file = file
         self._am = report.am
+        self._pm = report.pm
+        self.mit_only = mit_only
 
     def mit(self):
         return FightCheck.Mit(self)
@@ -112,19 +127,23 @@ class FightCheck:
     def passed(self, boss_cast: str) -> bool:
         return len(self.events.casts(boss_cast)) > 0
 
-    def run(self, fight_id: int) -> bool:
-        """Returns true if success, false if failure"""
-        raise NotImplementedError('Run subclass')
+    def run(self, fight_id: int):
+        raise NotImplementedError('Run subclass of FightCheck')
 
 class FightCheckDsu(FightCheck):
-    def __init__(self, report: Report):
+    def __init__(self, report: Report, *args, **kwargs):
         if report.encounter is not Encounter.DSU:
             raise TypeError(f'Using DSU checker for {encounter=}')
-        super().__init__(report)
+        super().__init__(report, *args, **kwargs)
 
     def run(self, fight_id: int) -> None:
         self.fight = self._r.fight(fight_id)
         self.events = self._r.events(fight_id)
+        # whether to include fight info
+        self.mit_only = True
+
+        f = self._file
+
         if self.fight is None or self.events is None:
             print("No fight/events")
             return False
@@ -132,23 +151,23 @@ class FightCheckDsu(FightCheck):
         tank1 = 'Daellin Kannose'
         tank2 = 'Pamella Royce'
 
-        with open('checker.txt', 'w') as f:
-            f.write(f'{self.fight.i=}\n')
-            if self.fight.last_phase == 0: return # ignore door
-            self.p2_thordan(f)
-            if self.fight.last_phase == 1: return # p2
-            self.p3_nidhogg(f)
-            if self.fight.last_phase == 2: return
-            self.p4_eyes(f)
-            if self.fight.last_phase == 3: return
-            self.i1_intermission(f)
-            if self.fight.last_phase == 4: return
-            self.p5_thordan(f)
+        f.write(f'\n----Fight:{self.fight.i} {self._pm._to_phase_name(self.fight.last_phase)} {100 - self.fight.percent:02.0f}%----\n')
+        if self.fight.last_phase == 0: return # ignore door
+        self.p2_thordan()
+        if self.fight.last_phase == 1: return # p2
+        self.p3_nidhogg()
+        if self.fight.last_phase == 2: return
+        self.p4_eyes()
+        if self.fight.last_phase == 3: return
+        self.i1_intermission()
+        if self.fight.last_phase == 4: return
+        self.p5_thordan()
+        if self.fight.last_phase == 5: return
+        self.p6_adds()
+        return
 
-        return True
-
-
-    def p2_thordan(self, f: File) -> None:
+    def p2_thordan(self) -> None:
+        f = self._file
         self.mit().at("Ascalon's Might", 0)\
             .has('Daellin Kannose', [
                 'Rampart',
@@ -156,7 +175,7 @@ class FightCheckDsu(FightCheck):
                 'Reprisal',
                 'Heart of Corundum',
                 'Blackest Night'
-            ]).check(f)
+            ]).check()
 
         self.mit().at("Ascalon's Might", 1)\
             .has('Daellin Kannose', [
@@ -164,7 +183,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Reprisal',
                 'Heart of Corundum',
-            ]).check(f)
+            ]).check()
 
         self.mit().at("Ascalon's Might", 2)\
             .has('Daellin Kannose', [
@@ -172,7 +191,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Reprisal',
                 'Heart of Corundum',
-            ]).check(f)
+            ]).check()
 
         self.mit().at('Ancient Quaga', 0)\
             .all_have([
@@ -183,7 +202,7 @@ class FightCheckDsu(FightCheck):
                 'Addle',
                 'Feint',
                 # 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
 
         self.mit().at('Heavenly Heel', 0)\
             .has('Daellin Kannose', [
@@ -193,7 +212,7 @@ class FightCheckDsu(FightCheck):
                 'Reprisal',
                 'Heart of Light',
                 'Blackest Night'
-            ]).check(f)
+            ]).check()
 
         self.mit().at("Ascalon's Might", 3)\
             .has('Pamella Royce', [
@@ -203,7 +222,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Reprisal',
                 'Heart of Corundum',
-            ]).check(f)
+            ]).check()
 
         self.mit().at("Ascalon's Might", 4)\
             .has('Pamella Royce', [
@@ -213,7 +232,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Reprisal',
                 'Heart of Corundum',
-            ]).check(f)
+            ]).check()
 
         self.mit().at("Ascalon's Might", 5)\
             .has('Pamella Royce', [
@@ -223,7 +242,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Reprisal',
                 'Heart of Corundum',
-            ]).check(f)
+            ]).check()
 
         self.mit().at('Ultimate End')\
             .all_have([
@@ -234,9 +253,10 @@ class FightCheckDsu(FightCheck):
                 'Addle',
                 'Feint',
                 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
 
-    def p3_nidhogg(self, f: File) -> None:
+    def p3_nidhogg(self) -> None:
+        f = self._file
         self.mit().at('Final Chorus')\
             .all_have([
                 'Kerachole',
@@ -245,27 +265,25 @@ class FightCheckDsu(FightCheck):
                 'Magick Barrier',
                 'Improvised Finish',
                 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
 
         # WYRMHOLE
         f.write('\nWYRMHOLE\n')
-        if len(self.events.casts('Dive from Grace')) <= 0:
-            f.write('not reached\n')
-            return
 
-        first_in_line = self._am.aura_on('First in Line', self.fight.i)
-        f.write(f'{first_in_line=}\n')
+        if not self.mit_only:
+            first_in_line = self._am.aura_on('First in Line', self.fight.i)
+            f.write(f'{first_in_line=}\n')
 
-        second_in_line = self._am.aura_on('Second in Line', self.fight.i)
-        f.write(f'{second_in_line=}\n')
+            second_in_line = self._am.aura_on('Second in Line', self.fight.i)
+            f.write(f'{second_in_line=}\n')
 
-        third_in_line = self._am.aura_on('Third in Line', self.fight.i)
-        f.write(f'{third_in_line=}\n')
+            third_in_line = self._am.aura_on('Third in Line', self.fight.i)
+            f.write(f'{third_in_line=}\n')
 
-        up_arrow = self._am.aura_on('Elusive Jump Target', self.fight.i)
-        down_arrow = self._am.aura_on('Spineshatter Dive Target', self.fight.i)
-        f.write(f'{up_arrow=}\n')
-        f.write(f'{down_arrow=}\n')
+            up_arrow = self._am.aura_on('Elusive Jump Target', self.fight.i)
+            down_arrow = self._am.aura_on('Spineshatter Dive Target', self.fight.i)
+            f.write(f'{up_arrow=}\n')
+            f.write(f'{down_arrow=}\n')
 
         self.mit().at('Eye of the Tyrant', 0)\
             .all_have([
@@ -274,7 +292,7 @@ class FightCheckDsu(FightCheck):
                 'Feint',
                 'Neutral Sect',
                 # 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
 
         self.mit().at('Eye of the Tyrant', 1)\
             .all_have([
@@ -285,7 +303,7 @@ class FightCheckDsu(FightCheck):
                 'Feint',
                 # 'Eukrasian Prognosis',
                 # 'Collective Unconscious'
-            ]).check(f)
+            ]).check()
 
         # 4 towers-not implemented
 
@@ -298,7 +316,7 @@ class FightCheckDsu(FightCheck):
                 'Oblation',
                 'Blackest Night',
                 'Kerachole'
-            ]).check(f)
+            ]).check()
 
         self.mit().at_event(tether.to('Pamella Royce'))\
             .has('Pamella Royce', [
@@ -309,10 +327,13 @@ class FightCheckDsu(FightCheck):
                 'Heart of Corundum',
                 'Exaltation',
                 'Kerachole'
-            ]).check(f)
+            ]).check()
 
-    def p4_eyes(self, f: File) -> None:
+    def p4_eyes(self) -> None:
+        f = self._file
         f.write('\nEYES\n')
+        if self.mit_only: return
+
         red = self._am.aura('Clawbound', self.fight.i)
         initial_red = red[0:4].named().to_target()
         f.write(f'{initial_red=}\n')
@@ -321,20 +342,24 @@ class FightCheckDsu(FightCheck):
         dives = self.events.casts('Mirage Dive')[2:]
         dive_targets = dives.named().to_target()
 
-        red = self._am.applied_at(dives[0]).ability('Clawbound')
-        red = red.named().to_target()
-        f.write(f'{red=}\n')
-        f.write(f'First dives: {dive_targets[0:2]}\n')
-        red = self._am.applied_at(dives[2]).ability('Clawbound')
-        red = red.named().to_target()
-        f.write(f'{red=}\n')
-        f.write(f'Second dives: {dive_targets[2:4]}\n')
-        red = self._am.applied_at(dives[4]).ability('Clawbound')
-        red = red.named().to_target()
-        f.write(f'{red=}\n')
-        f.write(f'Third dives: {dive_targets[4:6]}\n')
+        try:
+            red = self._am.applied_at(dives[0]).ability('Clawbound')
+            red = red.named().to_target()
+            f.write(f'{red=}\n')
+            f.write(f'First dives: {dive_targets[0:2]}\n')
+            red = self._am.applied_at(dives[2]).ability('Clawbound')
+            red = red.named().to_target()
+            f.write(f'{red=}\n')
+            f.write(f'Second dives: {dive_targets[2:4]}\n')
+            red = self._am.applied_at(dives[4]).ability('Clawbound')
+            red = red.named().to_target()
+            f.write(f'{red=}\n')
+            f.write(f'Third dives: {dive_targets[4:6]}\n')
+        except IndexError:
+            return
 
-    def i1_intermission(self, f: File) -> None:
+    def i1_intermission(self) -> None:
+        f = self._file
         f.write('\nINTERMISSION\n')
         brightwing = self.events.casts('Brightwing')
         brightwing_order = brightwing.named().to_target()
@@ -342,19 +367,19 @@ class FightCheckDsu(FightCheck):
         self.mit().at_event(brightwing.to(brightwing_order[0]))\
             .has(brightwing_order[0:2],
                 ['Dark Force', 'Gunmetal Soul']
-            ).check(f)
+            ).check()
         self.mit().at_event(brightwing.to(brightwing_order[2]))\
             .has(brightwing_order[2:4],
                 ['Riddle of Earth', 'Kerachole', 'Oblation', 'Exaltation']
-            ).check(f)
+            ).check()
         self.mit().at_event(brightwing.to(brightwing_order[4]))\
             .has(brightwing_order[4:6],
                 ['Heart of Light', 'Dark Missionary', 'Oblation', 'Heart of Corundum']
-            ).check(f)
+            ).check()
         self.mit().at_event(brightwing.to(brightwing_order[6]))\
             .has(brightwing_order[6:8],
                 ['Heart of Light', 'Dark Missionary', 'Reprisal']
-            ).check(f)
+            ).check()
 
         self.mit().at('Pure of Heart')\
             .all_have([
@@ -365,27 +390,30 @@ class FightCheckDsu(FightCheck):
                 'Addle',
                 'Feint',
                 'Collective Unconscious'
-            ]).check(f)
+            ]).check()
 
-    def p5_thordan(self, f: File):
+    def p5_thordan(self):
+        f = self._file
         f.write('\nThordan II\n')
         f.write('Wrath of the Heavens\n')
 
-        lightning = self._am.aura_on('Thunderstruck', self.fight.i)
-        defamation = self.events.casts('Skyward Leap').in_phases("P5").named().to_target()
-        tethers = self.events.casts('Spiral Pierce').named().to_target()
-        liquid_heaven = self.events.ability('Liquid Heaven')\
-            .types("calculateddamage").named().to_target()
-        # cauterize doesn't have target information
-        # altar fire doesn't have target information
+        if not self.mit_only:
+            lightning = self._am.aura_on('Thunderstruck', self.fight.i)
+            defamation = self.events.casts('Skyward Leap').in_phases("P5").named().to_target()
+            # tethers doesnt have accurate target information
+            tethers = self.events.ability('Spiral Pierce').types('calculateddamage').named().to_target()
+            liquid_heaven = self.events.ability('Liquid Heaven')\
+                .types("calculateddamage").named().to_target()
+            # cauterize doesn't have target information
+            # altar fire doesn't have target information
 
-        f.write(f'{lightning=}\n')
-        f.write(f'{defamation=}\n')
-        f.write(f'{tethers=}\n')
-        f.write(f'{liquid_heaven=}\n')
+            f.write(f'{lightning=}\n')
+            f.write(f'{defamation=}\n')
+            f.write(f'{tethers=}\n')
+            f.write(f'{liquid_heaven=}\n')
 
         self.mit().at("Ascalon's Mercy Revealed")\
-            .all_have(['Shield Samba', 'Eukrasian Prognosis']).check(f)
+            .all_have(['Shield Samba', 'Eukrasian Prognosis']).check()
 
         self.mit().at('Ancient Quaga', 1)\
             .all_have([
@@ -397,15 +425,56 @@ class FightCheckDsu(FightCheck):
                 'Feint',
                 'Addle',
                 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
+
+        self.mit().at('Heavenly Heel', 1)\
+            .has('Daellin Kannose', [
+                'Shadow Wall',
+                'Oblation',
+                'Exaltation',
+                'Reprisal',
+                'Heart of Light',
+                'Blackest Night'
+            ]).check()
+
+        self.mit().at("Ascalon's Might", 6)\
+            .has('Pamella Royce', [
+                'Rampart',
+                'Camouflage',
+                'Nebula',
+                'Oblation',
+                'Reprisal',
+                'Heart of Corundum',
+            ]).check()
+
+        self.mit().at("Ascalon's Might", 7)\
+            .has('Pamella Royce', [
+                'Rampart',
+                'Camouflage',
+                'Nebula',
+                'Oblation',
+                'Reprisal',
+                'Heart of Corundum',
+            ]).check()
+
+        self.mit().at("Ascalon's Might", 8)\
+            .has('Pamella Royce', [
+                'Rampart',
+                'Camouflage',
+                'Nebula',
+                'Oblation',
+                'Reprisal',
+                'Heart of Corundum',
+            ]).check()
 
         f.write('\nDeath of the Heavens\n')
 
-        dooms = self._am.aura_on('Doom', self.fight.i)
-        f.write(f'{dooms=}\n')
+        if not self.mit_only:
+            dooms = self._am.aura_on('Doom', self.fight.i)
+            f.write(f'{dooms=}\n')
 
         self.mit().at('Heavensflame')\
-            .all_have(['Kerachole', 'Panhaima', 'Eukrasian Prognosis']).check(f)
+            .all_have(['Kerachole', 'Panhaima', 'Eukrasian Prognosis']).check()
 
         self.mit().at('Ancient Quaga', 2)\
             .all_have([
@@ -418,33 +487,129 @@ class FightCheckDsu(FightCheck):
                 'Feint',
                 'Addle',
                 'Eukrasian Prognosis'
-            ]).check(f)
+            ]).check()
 
+        self.mit().at('Heavenly Heel', 2)\
+            .has('Daellin Kannose', [
+                'Living Dead'
+            ]).check()
 
-# Heavenly Heel 1:
-# Both tanks kitchen sink
+    def p6_adds(self):
+        f = self._file
+        pass
 
-# Death of the Heavens
+# Phase 6 - Nidhogg and Hraesvalgr
 
-# Before going out:
-# Shields
+# Staggering Wyrmsbreath 
+
+# 30% + personal (TBN/HoC)
+
+# Akh Afah 1
+
+# Reprisal (GNB)
+# Collective Unconscious
+# Kerachole
+# Magick Barrier
+
+# Hallowed Plume 1
+
+# GNB: Reprisal (DRK) + Rampart + Heart of Corundrum + Feint (SAM) (~65%)
+# DRK: Reprisal (DRK) + Rampart + Dark Mind + Oblation + Taurochole + TBN + Addle + Feint (SAM) (~45%)
+
+# Akh Morn x 5
+
 # Kerachole
 # Panhaima
-
-# Chains + Explosions Mit:
-# Shields
 # Holos
+# Dark Missionary
+# Addle
+# Samba
+# Neutral
 
-# Heavenly Heel 2:
-# Living Dead 
+# Akh Afah 2
 
+# Reprisal (GNB)
+# Collective Unconscious
+# Kerachole
+# Heart of Light
+# Zoe Shields
 
+# Hallowed Plume 2
+
+# GNB: Reprisal (DRK) + Heart of Corundrum + Feint (MNK) (45%)
+# DRK: Reprisal (DRK) + TBN + Exhaltation + Feint (MNK) + Tauro (35% with fat shield)
+
+# Wyrmsbreath 2
+
+# Rampart + 30%s done right before cast
+# Camo on GNB
+
+# Cauterize
+# GNB: 
+# Rampart + 30% + Camo leftover from Wyrmsbreath
+# Heart of Corundrum
+# Oblation
+# Kerachole
+
+# DRK
+# Rampart + Shadow Wall leftover from Wyrmsbreath
+# Oblation
+# TBN
+# Kerachole
+# Dark Mind
+# Exhaltation
+
+# Alternate End
+# Kerachole
+# Holos
+# Magick Barrier
+# Collective Unconscious
+# Heart of Light
+# Improv
+# Zoe Shields
+# Mantra
+# Neutral
+
+# Akh Morn's Edge 1
+# 1-1-6 stack
+# Bolide
+# Kitchen Sink DRK
+
+# Gigaflare Edge 1 (81s to gigaflare edge 2) (> 2min to akh morn's edge 3)
+# Kerachole
+# Reprisal
+# Feint
+# Addle
+# Panhaima
+# Magick Barrier
+# Holos
+# Neutral
+# Collective
+# Mantra
+
+# Akh Morn's Edge 2
+# Living Dead
+# Kitchen Sink GNB
+
+# Gigaflare Edge 2
+# Kerachole
+# Heart of Light
+# Dark Missionary
+# Samba
+# Reprisal
+# Collective
+# Feint
+
+# Akh Morn's Edge 3
+# Copy paste from Gigaflare's edge 1
 
 reportCode = ReportCodes.JULY26.value
-fight_id = 43
+fight_id = 34
 
-# client = FFClient(CLIENT_ID, CLIENT_SECRET)
-# report = Report(reportCode, client, Encounter.DSU)
-# checker = FightCheckDsu(report)
-# checker.execute(fight_id)
-
+client = FFClient(CLIENT_ID, CLIENT_SECRET)
+report = Report(reportCode, client, Encounter.DSU)
+with open('checker.txt', 'w') as f:
+    checker = FightCheckDsu(report, f)
+    # checker.run(36)
+    for x in range(1,44):
+        checker.run(x)

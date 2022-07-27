@@ -93,6 +93,8 @@ class EventList:
         return self.ability(ability_name).types("cast")
 
     def by(self, name: str) -> EventList:
+        if len(self)==0:
+            return EventList(list(), self._r)
         if type(self._ls[0].source) is int:
             actor_ids = self._r.get_actor_ids(name)
             new_list = [e for e in self._ls if e.source in actor_ids]
@@ -101,11 +103,13 @@ class EventList:
         return EventList(new_list, self._r)
 
     def to(self, name: str) -> EventList:
+        if len(self)==0:
+            return EventList(list(), self._r)
         if type(self._ls[0].target) is int:
             actor_ids = self._r.get_actor_ids(name)
             new_list = [e for e in self._ls if e.target in actor_ids]
         else:
-            new_list = [e for e in self._ls if e.target is name]
+            new_list = [e for e in self._ls if e.target==name]
         return EventList(new_list, self._r)
 
     def before(self, event: Event) -> EventList:

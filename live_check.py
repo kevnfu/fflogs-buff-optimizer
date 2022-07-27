@@ -11,10 +11,11 @@ report = Report(reportCode, client, Encounter.DSU)
 
 checker = FightCheckDsu(report)
 
-current_fight = 1
+current_fight = 2
 while (line:=input('Fight#?')) != 'x':
     if line.isdigit():
         current_fight = int(line)
 
-    checker.run(current_fight)
-    print('Done')
+    if report.fight(fight_id) is not None:
+        checker.run(current_fight)
+        print('Done')
