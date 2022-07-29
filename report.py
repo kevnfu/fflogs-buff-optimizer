@@ -18,14 +18,7 @@ class Report:
     def __init__(self, code: str, client: 'FFClient', encounter: Encounter) -> None:
         self._client = client
         self.code = code
-        self.encounter = encounter
-        match self.encounter:
-            case Encounter.DSU: 
-                self.pm = PhaseModelDsu(self)
-            case Encounter.TEA:
-                self.pm = PhaseModelTea(self)
-            case _:
-                raise NotImplementedError(f'No phase model for {self.encounter}')
+        self._load_phase_model(encounter)
 
         self.am = AuraModel(self)
         self.data = dict() # to be filled w/ individual calls
@@ -33,6 +26,16 @@ class Report:
         self._fetch_master_data()
         self._fights = self._fetch_all_fights() # {fight id: fight}
         self._events = dict() # {fight id: EventList w/ all events}
+
+    def _load_phase_model(self, encounter: Encounter):
+        self.encounter = encounter
+        match self.encounter:
+            case Encounter.DSU:
+                self.pm = PhaseModelDsu(self)
+            case Encounter.TEA:
+                self.pm = PhaseModelTea(self)
+            case _:
+                raise NotImplementedError(f'No phase model for {self.encounter}')
 
     def _fetch_master_data(self) -> None:
         res = self._client.q(Q_MASTER_DATA, {
@@ -52,11 +55,7 @@ class Report:
             f.write(json.dumps(report['masterData']['abilities'], indent=4))
 
         self.actors = [Actor(a) for a in report['masterData']['actors']]
-        # self.actors_by_id = {a.i: a for a in self.actors}
-
         self.abilities = [Ability(a) for a in report['masterData']['abilities']]
-        # self.abilities_by_id = {a.i: a for a in self.abilities}
-        # self.abilities_by_name = {a.name: a for a in self.abilities}
 
     def _fetch_all_fights(self) -> list(Fight):
         res = self._client.q(Q_FIGHTS, {
@@ -65,7 +64,6 @@ class Report:
         report = res['reportData']['report']
         report['fights']
         return {f['id']: Fight(f) for f in report['fights']}
-        # self._fights_by_id = {f.i: f for f in self._fights}
 
     def _fetch_fight(self, fight_id: int) -> Fight:
         """Tries to obtain fight from the server"""
@@ -153,7 +151,10 @@ class Report:
             self._events[fight_id] = self._fetch_all_events(fight_id)
         return self._events[fight_id]
 
-    def _fetch_events(self, filter_expression: str='', fight_ids: list[Int]=[]) -> EventList:
+    def _fetch_events(self, filter_expression: str='', fight_ids: int|list[Int]=[]) -> EventList:
+        if isinstance(fight_ids, int):
+            fight_ids = [fight_ids]
+
         start_time = self.first_fight().start_time
         all_events = []
         while start_time:
@@ -200,17 +201,20 @@ class Report:
             ls.append(f'{self._to_output(time)} {event.fight}{phase}@{phase_time:.0f}s')
         print(separator.join(ls))
 
-    def print_pull_times(self) -> Report:
+    def print_pull_times(self, *, offset: int=0) -> Report:
         """Print start time for all fights"""
         for fight in self._fights.values():
-            time = self._relative_time(fight.start_time)
+            time = self._relative_time(fight.start_time + offset)
             phase = self.pm._to_phase_name(fight.last_phase)
             output = f'{self._to_output(time)} Start of F{fight.i}-end:{phase}{fight.percent}%'
             print(output)
         return self
 
-    def print_phase_times(self, phases: list[str], offset=0) -> Report:
+    def print_phase_times(self, phases: str | list[str], *, offset: int=0) -> Report:
         """Takes a list of phase names and outputs the start of those phases"""
+        if isinstance(phases, str):
+            phases = [phases]
+
         for phase_event in self.pm.phase_starts(phases):
             phase = self.pm.phase_name(phase_event)
             time = self._relative_time(phase_event.time + offset)
@@ -240,12 +244,22 @@ class Report:
         return hour, minute, second
 
     @staticmethod
-    def _youtube_time(time: int) -> str:
+    def _youtube_time(time: tuple(int, int, int)) -> str:
         hour, minute, second = time
-        return f'{hour:02.0f}:{minute:02.0f}:{second:02.0f}'
+        output_str = ''
+        if hour != 0:
+            output_str += f'{hour:02.0f}:'
+        output_str += f'{minute:02.0f}:{second:02.0f}'
+        return output_str
 
     @staticmethod
-    def _twitch_url(time: int, code: str) -> str:
+    def _youtube_url(time: tuple(int, int, int), code: str) -> str:
+        hour, minute, second = time
+        second += minute * 60 + hour * 60 * 60
+        return f'https://youtu.be/{code}?t={second}'
+
+    @staticmethod
+    def _twitch_url(time: tuple(int, int, int), code: str) -> str:
         hour, minute, second = time
         minute += hour * 60
         return f'https://www.twitch.tv/videos/{code}?t={minute}m{second}s'
@@ -262,6 +276,10 @@ class Report:
         match self.output_type:
             case Platform.YOUTUBE:
                 return self._youtube_time(time)
+            case Platform.YOUTUBE_LINK:
+                if self.output_code is None:
+                    raise ValueError('No youtube video code.')
+                return self._youtube_url(time, self.output_code)
             case Platform.TWITCH:
                 if self.output_code is None:
                     raise ValueError('No twitch video code.')

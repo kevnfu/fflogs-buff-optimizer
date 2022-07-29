@@ -333,24 +333,24 @@ class FightCheckDsu(FightCheck):
         if self.mit_only: return
 
         red = self._am.aura('Clawbound', self.fight.i)
-        initial_red = red[0:4].named().to_target()
+        initial_red = red[0:4].named().to_targets()
         f.write(f'{initial_red=}\n')
 
         # first 2 casts are non-damaging
         dives = self.events.casts('Mirage Dive')[2:]
-        dive_targets = dives.named().to_target()
+        dive_targets = dives.named().to_targets()
 
         try:
             red = self._am.applied_at(dives[0]).ability('Clawbound')
-            red = red.named().to_target()
+            red = red.named().to_targets()
             f.write(f'{red=}\n')
             f.write(f'First dives: {dive_targets[0:2]}\n')
             red = self._am.applied_at(dives[2]).ability('Clawbound')
-            red = red.named().to_target()
+            red = red.named().to_targets()
             f.write(f'{red=}\n')
             f.write(f'Second dives: {dive_targets[2:4]}\n')
             red = self._am.applied_at(dives[4]).ability('Clawbound')
-            red = red.named().to_target()
+            red = red.named().to_targets()
             f.write(f'{red=}\n')
             f.write(f'Third dives: {dive_targets[4:6]}\n')
         except IndexError:
@@ -360,7 +360,7 @@ class FightCheckDsu(FightCheck):
         f = self._file
         f.write('\nINTERMISSION\n')
         brightwing = self.events.casts('Brightwing')
-        brightwing_order = brightwing.named().to_target()
+        brightwing_order = brightwing.named().to_targets()
         f.write(f'{brightwing_order=}\n')
         self.mit().at_event(brightwing.to(brightwing_order[0]))\
             .has(brightwing_order[0:2],
@@ -397,11 +397,11 @@ class FightCheckDsu(FightCheck):
 
         if not self.mit_only:
             lightning = self._am.aura_on('Thunderstruck', self.fight.i)
-            defamation = self.events.casts('Skyward Leap').in_phases("P5").named().to_target()
+            defamation = self.events.casts('Skyward Leap').in_phases("P5").named().to_targets()
             # tethers doesnt have accurate target information
-            tethers = self.events.ability('Spiral Pierce').types('calculateddamage').named().to_target()
+            tethers = self.events.ability('Spiral Pierce').types('calculateddamage').named().to_targets()
             liquid_heaven = self.events.ability('Liquid Heaven')\
-                .types("calculateddamage").named().to_target()
+                .types("calculateddamage").named().to_targets()
             # cauterize doesn't have target information
             # altar fire doesn't have target information
 

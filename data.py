@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Dict, Tuple, Iterator, Any
+from typing import Callable, Any
 
 import json
 from dataclasses import dataclass
@@ -53,29 +53,20 @@ class EventList:
 
     def types(self, types: str | list[str]) -> EventList:
         if isinstance(types, str):
-            new_list = [e for e in self._ls if e.type_==types]
-        elif isinstance(types, list):
-            new_list = [e for e in self._ls if e.type_ in types]
-        else:
-            raise TypeError(f'needs str or list[str], got {types=}')
+            types = [types]
+        new_list = [e for e in self._ls if e.type_ in types]
         return EventList(new_list, self._r)
 
     def in_phases(self, phases: str | list[str]) -> EventList:
         if isinstance(phases, str):
-            new_list = [e for e in self._ls if self._r.pm.phase_name(e) == phases]
-        elif isinstance(phases, list):
-            new_list = [self.pm.in_phase(p) for p in phases]
-        else:
-            raise TypeError(f'needs str or list[str], got {phases=}')
+            phases = [phases]
+        new_list = [e for e in self._ls if self._r.pm.phase_name(e) in phases]
         return EventList(new_list, self._r).sort_phase_time()
 
     def in_fights(self, fight_ids: int | list[int]) -> EventList:
         if isinstance(fight_ids, int):
-            new_list = [e for e in self._ls if e.fight==fight_ids]
-        elif isinstance(fight_ids, list):
-            new_list = [e for e in self._ls if e.fight in fight_ids]
-        else:
-            raise TypeError(f'needs int or list[int], got {fight_ids=}')
+            fight_ids = [fight_ids]
+        new_list = [e for e in self._ls if e.fight in fight_ids]
         return EventList(new_list, self._r)
 
     def ability(self, ability_name: str) -> EventList:
@@ -90,34 +81,38 @@ class EventList:
     def by(self, name: str) -> EventList:
         if len(self)==0:
             return EventList(list(), self._r)
-        if type(self._ls[0].source) is int:
+        if isinstance(self._ls[0].source, int):
             actor_ids = self._r.get_actor_ids(name)
             new_list = [e for e in self._ls if e.source in actor_ids]
         else:
             new_list = [e for e in self._ls if e.source is name]
         return EventList(new_list, self._r)
 
-    def by_friendly(self) -> EventList:
-        pass
+    def by_players(self) -> EventList:
+        new_list = [e for e in self._ls if self._r.get_actor(e.source).type_=='Player']
+        return EventList(new_list, self._r)
 
-    def by_hostile(self) -> EventList:
-        pass
+    def by_npcs(self) -> EventList:
+        new_list = [e for e in self._ls if self._r.get_actor(e.source).type_=='NPC']
+        return EventList(new_list, self._r)
 
     def to(self, name: str) -> EventList:
         if len(self)==0:
             return EventList(list(), self._r)
-        if type(self._ls[0].target) is int:
+        if isinstance(self._ls[0].target, int):
             actor_ids = self._r.get_actor_ids(name)
             new_list = [e for e in self._ls if e.target in actor_ids]
         else:
             new_list = [e for e in self._ls if e.target==name]
         return EventList(new_list, self._r)
 
-    def to_friendly(self) -> EventList:
-        pass
+    def to_players(self) -> EventList:
+        new_list = [e for e in self._ls if self._r.get_actor(e.target).type_=='Player']
+        return EventList(new_list, self._r)
 
-    def to_hostile(self) -> EventList:
-        pass
+    def to_npcs(self) -> EventList:
+        new_list = [e for e in self._ls if self._r.get_actor(e.target).type_=='NPC']
+        return EventList(new_list, self._r)
 
     def before(self, event: Event) -> EventList:
         new_list = [e for e in self._ls if e.time <= event.time]
@@ -127,10 +122,10 @@ class EventList:
         new_list = [e for e in self._ls if e.time >= event.time]
         return EventList(new_list, self._r)
 
-    def to_source(self) -> list(int | str):
+    def to_sources(self) -> list(int | str):
         return [e.source for e in self._ls]
 
-    def to_target(self) ->list(int | str):
+    def to_targets(self) ->list(int | str):
         return [e.target for e in self._ls]
 
     def sort_time(self, *, reverse=False) -> EventList:
@@ -144,6 +139,10 @@ class EventList:
     def sort_phase_time(self) -> EventList:
         self._ls.sort(key=lambda i: (self._r.pm.phase_time(i)))
         return self
+
+    def filter(self, func: Callable) -> EventList:
+        new_list = [*filter(func, self._ls)]
+        return EventList(new_list, self._r)
 
     def links(self, *args) -> EventList:
         self._r.links(self, *args)
