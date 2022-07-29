@@ -119,7 +119,7 @@ class FightCheck:
         self._file = file
         self._am = report.am
         self._pm = report.pm
-        self.mit_only = mit_only
+        self.mit_only = mit_only # whether to include fight info
 
     def mit(self):
         return FightCheck.Mit(self)
@@ -139,8 +139,6 @@ class FightCheckDsu(FightCheck):
     def run(self, fight_id: int) -> None:
         self.fight = self._r.fight(fight_id)
         self.events = self._r.events(fight_id)
-        # whether to include fight info
-        self.mit_only = False
 
         f = self._file
 

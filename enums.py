@@ -27,15 +27,21 @@ class User(Enum):
 class ReportCodes(Enum):
     JULY23 = "NvPKDTd3nfGF78Jp"
     JULY26 = "Q6GnmtMY9y3NrBLz"
+    JULY27MIRA = "NJCPxY9vFVb3zZKG"
     
 class Vod(Enum):
-    def __init__(self, code: int, offset: str, fight_id: int) -> None:
-        self.code = code
+    def __init__(self, code: ReportCodes, offset: str, fight_id: int,  url: int=None) -> None:
+        self.code = code.value
         self.offset = offset
         self.fight_id = fight_id
+        self.url = url
 
 class Yoon(Vod):
-    JULY23 = 1540569628, '13:27', 1
+    JULY23 = ReportCodes.JULY23, '13:27', 1, 1540569628
+    JULY26 = ReportCodes.JULY26, '02:56', 1, 1542924507
 
 class Anna(Vod):
-    JULY26 = 1542923962, '03:32', 1
+    JULY27MIRA = ReportCodes.JULY26, '03:32', 1, 1542923962
+
+class Mira(Vod):
+    JULY27 = ReportCodes.JULY27MIRA, '00:55', 24, 1543800290
