@@ -37,4 +37,6 @@ wrath = report.casts("Wrath of the Heavens")
 x = loop_povs([Yoon.JULY30, Anna.JULY30, Kevin.JULY30, Aaron.JULY30],
     report, wrath)
 
+client.save_cache()
+
 

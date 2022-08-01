@@ -1,3 +1,4 @@
+querycache/
 config.py
 *.txt
 *.json
