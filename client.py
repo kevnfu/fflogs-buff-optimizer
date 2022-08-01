@@ -55,7 +55,7 @@ class FFClient:
         cache_path = os.path.join(self.CACHE_DIR, 'cache.json')
 
         with open(cache_path, 'w') as f:
-            json.dump(self._cache, f, indent=2)
+            json.dump(self._cache, f)
 
     def load_cache(self) -> None:
         if not os.path.exists(self.CACHE_DIR):
