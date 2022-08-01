@@ -138,6 +138,7 @@ class Report:
                 self._events[fight_id] = self._fetch_all_events(fight_id)
 
     def events(self, fight_id: int=None) -> EventList:
+        # get all events in report if no fight_id specified
         if fight_id is None:
             self._fetch_all_events_all_fights()
             ret = EventList(list(), self)
@@ -145,10 +146,15 @@ class Report:
                 ret += event_list
             return ret
 
+        # if not a valid fight in the report
         if self.fight(fight_id) is None:
             return None
+
+        # if not yet populated
         if fight_id not in self._events:
             self._events[fight_id] = self._fetch_all_events(fight_id)
+        
+        # return stored
         return self._events[fight_id]
 
     def _fetch_events(self, filter_expression: str='', fight_ids: int|list[Int]=[]) -> EventList:
@@ -192,15 +198,6 @@ class Report:
     def dummy_downs(self) -> EventList:
         return self._fetch_events("type='applydebuff' AND target.disposition='friendly' AND ability.name='Damage Down'")
 
-    def links(self, events: EventList, offset: int=0, separator: str='\n') -> None:
-        ls = list()
-        for event in events:
-            phase = self.pm.phase_name(event)
-            time = self._relative_time(event.time + offset)
-            phase_time = self.pm.phase_time(event) / 1000 # in seconds
-            ls.append(f'{self._to_output(time)} {event.fight}{phase}@{phase_time:.0f}s')
-        print(separator.join(ls))
-
     def print_pull_times(self, *, offset: int=0) -> Report:
         """Print start time for all fights"""
         for fight in self._fights.values():
@@ -226,7 +223,7 @@ class Report:
         return self
 
     # outputs:
-    def set_video_offset_time(self, mmss: str, fight_id: int) -> Report:
+    def set_video_offset(self, mmss: str, fight_id: int) -> Report:
         """Put in timestamp of video at Fight fight_id"""
         minutes, seconds = mmss.split(':')
         ms = int(minutes)*1000*60 + int(seconds)*1000
@@ -235,7 +232,17 @@ class Report:
         self.offset = ms - fight.start_time
         return self
 
-    def _relative_time(self, time: int) -> tuple(int, int, int):
+    def set_output_type(self, output_type: Platform, code: str=None) -> Report:
+        self.output_type = output_type
+        self.output_code = code
+        return self
+
+    def set_vod(self, vod: Vod) -> Report:
+        self.set_video_offset(vod.offset, vod.fight_id)
+        self.set_output_type(vod.platform, vod.url)
+        return self
+        
+    def _relative_time(self, time: int) -> tuple[int, int, int]:
         """Takes event time and outputs video time"""
         ms = time + self.offset
         hour = floor(ms/(1000*60*60) % 24)
@@ -244,7 +251,7 @@ class Report:
         return hour, minute, second
 
     @staticmethod
-    def _youtube_time(time: tuple(int, int, int)) -> str:
+    def _youtube_time(time: tuple[int, int, int]) -> str:
         hour, minute, second = time
         output_str = ''
         if hour != 0:
@@ -253,21 +260,17 @@ class Report:
         return output_str
 
     @staticmethod
-    def _youtube_url(time: tuple(int, int, int), code: str) -> str:
+    def _youtube_url(time: tuple[int, int, int], code: str) -> str:
         hour, minute, second = time
         second += minute * 60 + hour * 60 * 60
         return f'https://youtu.be/{code}?t={second}'
 
     @staticmethod
-    def _twitch_url(time: tuple(int, int, int), code: str) -> str:
+    def _twitch_url(time: tuple[int, int, int], code: str) -> str:
         hour, minute, second = time
         minute += hour * 60
         return f'https://www.twitch.tv/videos/{code}?t={minute}m{second}s'
 
-    def set_output_type(self, output_type: Platform, code: str=None) -> Report:
-        self.output_type = output_type
-        self.output_code = code
-        return self
 
     def _to_output(self, time: int) -> str:
         if self.output_type is None:

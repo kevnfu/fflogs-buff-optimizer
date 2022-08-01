@@ -129,9 +129,23 @@ class AuraModel:
 
         return ret
 
-    def aura(self, aura_name: str, fight_id: int) -> EventList:
+    def aura(self, aura_list: str|int|list[int|str], fight_id: int) -> EventList:
         """All occurences of an aura, returning the list of apply events"""
-        ability_ids = self._report.get_ability(aura_name)
+        # make it a list
+        if not isinstance(aura_list, list):
+            aura_list = [aura_list]
+
+        # return empty list if no input
+        if len(aura_list) == 0:
+            return EventList(list(), self._report)
+
+        # convert auras to a list of ability ids
+        if isinstance(aura_list[0], str):
+            ability_ids = list()
+            for a in aura_list:
+                ability_ids += self._report.get_ability(a)
+        else:
+            ability_ids = aura_list
 
         auras = self.auras[fight_id]
         auras = [e for e in auras if e.abilityGameID in ability_ids and e.type_ in self.APPLIES]
@@ -139,8 +153,9 @@ class AuraModel:
 
     def aura_on(self, aura_name: str, fight_id: int) -> list[str]:
         """List of targets of an aura"""
-        targets = map(lambda x: self._report.get_actor(x.target).name, self.aura(aura_name, fight_id))
-        return list(targets)
+        # targets = map(lambda x: self._report.get_actor(x.target).name, self.auras(aura_name, fight_id))
+        # return list(targets)
+        return self.aura(aura_name, fight_id).named().to_targets()
 
 
 

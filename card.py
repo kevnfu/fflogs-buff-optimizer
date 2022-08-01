@@ -31,7 +31,7 @@ class CardAnalyzer:
     def get_plays(self):
         self._am
 
-video = Yoon.JULY26
+
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
-report = Report(video.code, client, Encounter.DSU)
+report = Report(ReportCodes.JULY25, client, Encounter.DSU)
 

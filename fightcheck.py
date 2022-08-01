@@ -601,7 +601,7 @@ class FightCheckDsu(FightCheck):
 # Akh Morn's Edge 3
 # Copy paste from Gigaflare's edge 1
 
-reportCode = ReportCodes.JULY26.value
+reportCode = ReportCodes.JULY25.value
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)

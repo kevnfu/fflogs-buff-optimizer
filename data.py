@@ -144,9 +144,12 @@ class EventList:
         new_list = [*filter(func, self._ls)]
         return EventList(new_list, self._r)
 
-    def links(self, *args) -> EventList:
-        self._r.links(self, *args)
-        return self
+    def links(self, offset: int=0) -> list[tuple[str, int]]:
+        link_ls = list()
+        for event in self._ls:
+            time = self._r._relative_time(event.time + offset)
+            link_ls.append((f'{self._r._to_output(time)} #{event.fight}', event.time))
+        return link_ls
 
     def named(self) -> EventList:
         new_list = list()

@@ -123,7 +123,7 @@ class PhaseModelDsu(PhaseModel):
 
         super().__init__(report)
 
-        self.PHASE_NAMES = ["P1", "P2", "P3", "P4", "I", "P5", "P6", "P7"]
+        self.PHASE_NAMES = ['P1', 'P2', 'P3', 'P4', 'I', 'P5', 'P6', 'P7']
 
     def _build(self, fight_id: int) -> EventList:
         EVENT_INDEX = [
@@ -139,20 +139,21 @@ class PhaseModelDsu(PhaseModel):
         # special case fight ended phase 1; timeline is a single event: fight start
         if fight.last_phase == 0: # Fight ended phase 1
             timeline = [Event.from_time(fight.start_time, fight.i)] # p1 start == fight start
-            return timeline
+            return EventList(timeline, self._report)
 
         # Events for this fight is only based on deaths and boss targetables.
-        deaths = self._report.events(fight.i).types("death").to_npcs()
+        deaths = self._report.events(fight.i).types('death').to_npcs()
         targetable = self._report.events(fight.i).types("targetabilityupdate")\
             .filter(lambda e: e.targetable==True)
 
         # Join both types of events and order chronologically
         phase_events = (deaths + targetable).sort_time()
-
+        
+        # timeline = list()
         # special P1 -> P2 case
-        if fight.last_phase == 1 and len(phase_events) > 2:
-            # In phase 1, first event is Adelphel targetable. Third is Charlbert
-            if phase_events[0].target != phase_events[2].target: 
+        # In phase 1, first event is Adelphel targetable. Third is Charlbert
+        if fight.last_phase == 1 and len(phase_events) > 2 and \
+            phase_events[0].target != phase_events[2].target:
                 # timeline is start of P1, Thordan appearing (4th event)
                 timeline = [Event.from_time(fight.start_time, fight.i), phase_events[4]]
         else:
@@ -165,11 +166,22 @@ class PhaseModelDsu(PhaseModel):
         return EventList(timeline, self._report)
 
 class PhaseModelTea(PhaseModel):
-    def __init__(self, code: str, client: FFClient, encounter: Encounter):
-        super().__init__(code, client, encounter)
-
+    def __init__(self, report: Report):
         if encounter is not Encounter.TEA:
             raise TypeError(f'Using TEA model for {encounter=}')
+        
+        super().__init__(report)
+        self.PHASE_NAMES = ['P1', 'I1', 'P2', 'I2', 'P3', 'P4']
 
-    def build(self):
-        raise NotImplementedError
+
+    def _build(self, fight_id: int) -> EventList:
+        # Cruise chaser casts Hawk Blaster
+        # BJ/CC Targetable
+        # Both bj/cc untargetable
+        # Alex Prime targetable
+        # first down for the count fades
+        
+
+        fight = self._report.fight(fight_id)
+
+        raise NotImplementedError('Use subclass of PhaseReport')
