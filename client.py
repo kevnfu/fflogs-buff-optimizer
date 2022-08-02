@@ -26,8 +26,8 @@ class FFClient:
         self._transport = RequestsHTTPTransport(url=self.CLIENT_API_URL)
         self._client = GQLClient(transport=self._transport, fetch_schema_from_transport=True)
 
+        # cache is {reportcode: {params+query: res}}
         self._cache = {}
-        self.load_cache()
         self.refresh_token()
 
     def refresh_token(self) -> FFClient:
@@ -40,39 +40,76 @@ class FFClient:
         return self
 
     def q(self, query: str, params: dict) -> dict:
-        key = query + json.dumps(params)
-        if key not in self._cache:
+        """with cache"""
+        report_code = params.get('reportCode', None)
+        if report_code is None:
             res = self._client.execute(gql(query), variable_values=params)
             print(res.get('rateLimitData', 'no rateLimitData'))
-            self._cache[key] = res
+            return res
 
-        return deepcopy(self._cache[key])
+        if report_code not in self._cache:
+            self.load_cache(report_code)
+
+        key = json.dumps(params) + query
+        if key not in self._cache.setdefault(report_code, {}):
+            res = self._client.execute(gql(query), variable_values=params)
+            print(res.get('rateLimitData', 'no rateLimitData'))
+            self._cache[report_code][key] = res
+
+        return deepcopy(self._cache[report_code][key])
 
     def save_cache(self) -> None:
         if not os.path.exists(self.CACHE_DIR):
             os.makedirs(self.CACHE_DIR)
 
-        cache_path = os.path.join(self.CACHE_DIR, 'cache.json')
+        for report_code in self._cache:
+            cache_path = os.path.join(self.CACHE_DIR, f'{report_code}.json')
+            with open(cache_path, 'w') as f:
+                json.dump(self._cache[report_code], f)
 
-        with open(cache_path, 'w') as f:
-            json.dump(self._cache, f)
-
-    def load_cache(self) -> None:
+    def load_cache(self, report_code: str) -> bool:
         if not os.path.exists(self.CACHE_DIR):
-            return
-
-        cache_path = os.path.join(self.CACHE_DIR, 'cache.json')
+            return False
+        cache_path = os.path.join(self.CACHE_DIR, f'{report_code}.json')
 
         try:
             with open(cache_path, 'r') as f:
-                self._cache = json.load(f)
+                self._cache[report_code] = json.load(f)
+                return True
         except FileNotFoundError:
-            pass
+            # print(f"No cache for {report_code=}")
+            # self._cache[report_code] = {}
+            return False
 
     def clear_cache(self) -> None:
-        cache_path = os.path.join(self.CACHE_DIR, 'cache.json')
-        try:
-            os.remove(cache_path)
-        except OSError:
-            pass
+        cache_files = list(filter(
+            lambda f: f.endswith('.json'),
+            os.listdir(self.CACHE_DIR)
+        ))
 
+        for file in cache_files:
+            try:
+                os.remove(file)
+            except OSError:
+                pass
+
+    # def master_data(self, report_code: str) -> dict:
+    #     return self.q(Q_MASTER_DATA, {
+    #         'reportCode': report_code
+    #     })
+
+    # def fights(self, report_code: str, encounter_id: int, fight_id: int=None) -> dict:
+    #     return self.q(Q_FIGHTS, {
+    #         'reportCode': report_code,
+    #         'encounterID': encounter_id,
+    #         'fightIDs': [fight_id]
+    #         })
+
+    # def events(self, report_code: int, encounter_id: int, start_time: int, end_time: int, fight_id: int) -> dict:
+    #     return self.q(Q_EVENTS, {
+    #         'reportCode': report_code,
+    #         'encounterID': encounter_id,
+    #         'startTime': start_time,
+    #         'endTime': end_time,
+    #         'fightIDs':[fight_id]
+    #         })

@@ -11,6 +11,7 @@ from data import EventList
 
 from queries import Q_EVENTS
 
+
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     links = list()
     for v in vod_list:
@@ -32,11 +33,9 @@ report = Report(report_code, client, Encounter.DSU)
 # report.set_video_offset(video.offset, video.fight_id)\
 #     .set_output_type(video.platform, video.url)
 
-wrath = report.casts("Wrath of the Heavens")
+wrath = report.events().casts("Wrath of the Heavens")
 
 x = loop_povs([Yoon.JULY30, Anna.JULY30, Kevin.JULY30, Aaron.JULY30],
     report, wrath)
 
-client.save_cache()
-
-
+# client.save_cache()

@@ -69,7 +69,6 @@ class AuraModel:
     def __init__(self, report: Report):
         self.code = report.code
         self._report = report
-        self._client = report._client
         self.auras = dict() # fightID: aura mapping
         self.APPLIES = ['applybuff','applydebuff']
 
