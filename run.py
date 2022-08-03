@@ -15,6 +15,7 @@ from queries import Q_EVENTS
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     links = list()
     for v in vod_list:
+        v = v['AUG02']
         assert v.code == report.code
         report.set_vod(v)
 
@@ -25,7 +26,7 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     for i in links:
         print(i[0])
 
-report_code = ReportCodes.JULY30.value
+report_code = ReportCodes.AUG02.value
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(report_code, client, Encounter.DSU)
@@ -35,7 +36,7 @@ report = Report(report_code, client, Encounter.DSU)
 
 wrath = report.events().casts("Wrath of the Heavens")
 
-x = loop_povs([Yoon.JULY30, Anna.JULY30, Kevin.JULY30, Aaron.JULY30],
+x = loop_povs([Anna, Kevin, Aaron],
     report, wrath)
 
-# client.save_cache()
+client.save_cache()  
