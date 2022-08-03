@@ -85,6 +85,27 @@ query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTi
 }
 """
 
+Q_ABILITIES = """
+query Abilities ($page: Int){
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    gameData {
+        abilities(limit: 100, page: $page) {
+            data {
+                id,
+                name
+            },
+            current_page,
+            last_page,
+            has_more_pages
+        }
+    }
+}
+"""
+
+
 
 
 Q_ENCOUNTER = """

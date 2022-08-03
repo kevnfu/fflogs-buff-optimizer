@@ -9,7 +9,7 @@ from enums import Encounter, Platform, ReportCodes, Vod, Yoon, Anna, Mira, Kevin
 from report import Report
 from data import EventList
 
-from queries import Q_EVENTS
+from queries import Q_EVENTS, Q_ABILITIES
 
 
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
@@ -31,12 +31,10 @@ report_code = ReportCodes.AUG02.value
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(report_code, client, Encounter.DSU)
 
-# report.set_video_offset(video.offset, video.fight_id)\
-#     .set_output_type(video.platform, video.url)
 
 wrath = report.events().casts("Wrath of the Heavens")
 
 x = loop_povs([Anna, Kevin, Aaron],
     report, wrath)
 
-client.save_cache()  
+client.save_cache()

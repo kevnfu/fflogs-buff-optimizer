@@ -39,22 +39,22 @@ class FFClient:
         self._transport.headers = {'Authorization': f'Bearer {access_token}'}
         return self
 
-    def q(self, query: str, params: dict) -> dict:
-        """with cache"""
+    def _q(self, query: str, params: dict) -> dict:
+        res = self._client.execute(gql(query), variable_values=params)
+        print(res.get('rateLimitData', 'no rateLimitData'))
+        return res
+
+    def q(self, query: str, params: dict, *, cache: bool=True) -> dict:
         report_code = params.get('reportCode', None)
-        if report_code is None:
-            res = self._client.execute(gql(query), variable_values=params)
-            print(res.get('rateLimitData', 'no rateLimitData'))
-            return res
+        if report_code is None or cache is False:
+            return self._q(query, params)
 
         if report_code not in self._cache:
             self.load_cache(report_code)
 
         key = json.dumps(params) + query
         if key not in self._cache.setdefault(report_code, {}):
-            res = self._client.execute(gql(query), variable_values=params)
-            print(res.get('rateLimitData', 'no rateLimitData'))
-            self._cache[report_code][key] = res
+            self._cache[report_code][key] = self._q(query, params)
 
         return deepcopy(self._cache[report_code][key])
 

@@ -3,12 +3,11 @@ from typing import Any
 
 # standard
 import json
-from dataclasses import dataclass
 from math import floor
 
 # custom
 from enums import Encounter, Platform
-from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS
+from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS, Q_ABILITIES
 from data import Event, EventList, Fight, Ability, Actor
 from phases import PhaseModelDsu
 from aura import AuraModel
@@ -60,17 +59,17 @@ class Report:
     def _fetch_all_fights(self) -> list(Fight):
         res = self._client.q(Q_FIGHTS, {
             'reportCode': self.code,
-            'encounterID': self.encounter.value})
+            'encounterID': self.encounter.value}, cache=False)
         report = res['reportData']['report']
         report['fights']
         return {f['id']: Fight(f) for f in report['fights']}
 
     def _fetch_fight(self, fight_id: int) -> Fight:
-        """Tries to obtain fight from the server"""
+        """Tries to obtain fight from the server. Ignores cache"""
         res = self._client.q(Q_FIGHTS, {
             'reportCode': self.code,
             'encounterID': self.encounter.value,
-            'fightIDs': [fight_id]})
+            'fightIDs': [fight_id]}, cache=False)
         fight_list = res['reportData']['report']['fights']
         if fight_list: # if is not empty
             new_fight = Fight(fight_list[0])
@@ -290,3 +289,20 @@ class Report:
             case _:
                 raise ValueError('Not a supported platform')
 
+
+
+def update_ability_list(client: FFClient):
+    has_more_pages = True
+    page = 1
+    abilities = []
+    while has_more_pages:
+        res = client.q(Q_ABILITIES, {
+            'page': page
+            })
+        res = res['gameData']['abilities']
+        page = res['current_page'] + 1
+        has_more_pages = res['has_more_pages']
+        abilities += res['data']
+
+    with open('ability_master_list.json', 'w') as f:
+        json.dump(abilities, f)

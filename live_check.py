@@ -1,22 +1,27 @@
+import time
+
 from config import CLIENT_ID, CLIENT_SECRET
 from client import FFClient
-from enums import Encounter, Platform, ReportCodes,
+from enums import Encounter, ReportCodes
 from report import Report
 from fightcheck import FightCheckDsu
 
-reportCode = ReportCodes.JULY26.value
+LOOP_LIMIT = 10
+THROTTLE_TIME = 3
+
+reportCode = ReportCodes.AUG02.value
 
 client = FFClient(CLIENT_ID, CLIENT_SECRET)
 report = Report(reportCode, client, Encounter.DSU)
 
-checker = FightCheckDsu(report)
+last_fight_id = report.last_fight().i
+counter = 0
+while report.fight(last_fight_id+1) is None:
+    print('No new fight found')
+    time.sleep(THROTTLE_TIME)
+    counter += 1
+    if counter > LOOP_LIMIT:
+        break
 
-current_fight = 1
-while (line:=input(f'Fight {current_fight}?')) != 'x':
-    if line.isdigit():
-        current_fight = int(line)
-
-    if checker.run(current_fight):
-        print(f'Finished {current_fight=}')
-    else:
-        print(f'failed')
+with FightCheckDsu(report) as checker:
+    checker.run(last_fight_id + 1)

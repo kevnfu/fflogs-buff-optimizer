@@ -114,12 +114,18 @@ class FightCheck:
                         f.write(f'\n{individual_missing} missing from {k}')
                 f.write('\n')
 
-    def __init__(self, report: Report, file: File, *, mit_only=False) -> None:
+    def __init__(self, report: Report, *, mit_only=False) -> None:
         self._r = report
-        self._file = file
         self._am = report.am
         self._pm = report.pm
         self.mit_only = mit_only # whether to include fight info
+
+    def __enter__(self):
+        self._file = open('checker.txt', 'w')
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self._file.close()
 
     def mit(self):
         return FightCheck.Mit(self)
@@ -131,10 +137,10 @@ class FightCheck:
         raise NotImplementedError('Run subclass of FightCheck')
 
 class FightCheckDsu(FightCheck):
-    def __init__(self, report: Report, *args, **kwargs):
+    def __init__(self, report: Report, **kwargs):
         if report.encounter is not Encounter.DSU:
             raise TypeError(f'Using DSU checker for {encounter=}')
-        super().__init__(report, *args, **kwargs)
+        super().__init__(report, **kwargs)
 
     def run(self, fight_id: int) -> None:
         self.fight = self._r.fight(fight_id)
@@ -601,12 +607,10 @@ class FightCheckDsu(FightCheck):
 # Akh Morn's Edge 3
 # Copy paste from Gigaflare's edge 1
 
-reportCode = ReportCodes.JULY25.value
+if __name__ == '__main__':
+    reportCode = ReportCodes.JULY25.value
 
-client = FFClient(CLIENT_ID, CLIENT_SECRET)
-report = Report(reportCode, client, Encounter.DSU)
-with open('checker.txt', 'w') as f:
-    checker = FightCheckDsu(report, f)
-    checker.run(43)
-    # for x in range(44):
-        # checker.run(x)
+    client = FFClient(CLIENT_ID, CLIENT_SECRET)
+    report = Report(reportCode, client, Encounter.DSU)
+    with FightCheckDsu(report) as checker:
+        checker.run(43)
