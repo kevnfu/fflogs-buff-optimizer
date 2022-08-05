@@ -4,12 +4,12 @@ import json
 from operator import itemgetter
 
 from config import CLIENT_ID, CLIENT_SECRET
-from client import FFClient
-from enums import Encounter, Platform, ReportCodes, Vod, Yoon, Anna, Mira, Kevin, Aaron, Blake, Sarah
-from report import Report
-from data import EventList
+from client.client import FFClient
+from report.data import EventList
+from report.enums import Encounter, Platform, ReportCodes, Vod, Yoon, Anna, Mira, Kevin, Aaron, Blake, Sarah
+from report.report import Report
 
-from queries import Q_EVENTS, Q_ABILITIES
+from report.queries import Q_EVENTS, Q_ABILITIES
 
 
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:

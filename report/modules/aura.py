@@ -3,8 +3,8 @@ from typing import Any
 
 import json
 
-from enums import Encounter
-from data import Event, EventList
+from report.enums import Encounter
+from report.data import Event, EventList
 
 # does not include healing events
 Q_AURAS = """

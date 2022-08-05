@@ -4,8 +4,8 @@ from typing import Any
 import itertools 
 import json
 
-from enums import Encounter
-from data import Event, EventList, Fight
+from report.enums import Encounter
+from report.data import Event, EventList, Fight
 
 Q_TIMELINE = """
 query Timeline ($reportCode: String!, $encounterID: Int!, $startTime: Float, $endTime: Float){

@@ -6,11 +6,11 @@ import json
 from math import floor
 
 # custom
-from enums import Encounter, Platform
-from queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS, Q_ABILITIES
-from data import Event, EventList, Fight, Ability, Actor
-from phases import PhaseModelDsu
-from aura import AuraModel
+from report.enums import Encounter, Platform
+from report.queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS, Q_ABILITIES
+from report.data import Event, EventList, Fight, Ability, Actor
+from report.modules.phases import PhaseModelDsu
+from report.modules.aura import AuraModel
 
 class Report:
     """Report for one type of encounter"""
