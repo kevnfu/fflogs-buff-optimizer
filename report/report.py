@@ -9,7 +9,7 @@ from math import floor
 from report.enums import Encounter, Platform
 from report.queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS, Q_ABILITIES
 from report.data import Event, EventList, Fight, Ability, Actor
-from report.modules.phases import PhaseModelDsu
+from report.modules.phases import PhaseModelDsu, PhaseModelTea
 from report.modules.aura import AuraModel
 
 class Report:

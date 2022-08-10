@@ -78,15 +78,21 @@ class EventList:
     def casts(self, ability_name: str):
         return self.ability(ability_name).types("cast")
 
-    def by(self, name: str) -> EventList:
+    def by(self, names: str) -> EventList:
         if len(self)==0:
             return EventList(list(), self._r)
-        if isinstance(self._ls[0].source, int):
+        
+        if not isinstance(names, list):
+            names = [names]
+
+        all_ids = []
+        for name in names:
             actor_ids = self._r.get_actor_ids(name)
-            new_list = [e for e in self._ls if e.source in actor_ids]
-        else:
-            new_list = [e for e in self._ls if e.source is name]
+            all_ids += actor_ids
+        
+        new_list = [e for e in self._ls if e.target in all_ids]
         return EventList(new_list, self._r)
+
 
     def by_players(self) -> EventList:
         new_list = [e for e in self._ls if self._r.get_actor(e.source).type_=='Player']
@@ -96,14 +102,18 @@ class EventList:
         new_list = [e for e in self._ls if self._r.get_actor(e.source).type_=='NPC']
         return EventList(new_list, self._r)
 
-    def to(self, name: str) -> EventList:
+    def to(self, names: str | list[str]) -> EventList:
         if len(self)==0:
             return EventList(list(), self._r)
-        if isinstance(self._ls[0].target, int):
+        if not isinstance(names, list):
+            names = [names]
+
+        all_ids = []
+        for name in names:
             actor_ids = self._r.get_actor_ids(name)
-            new_list = [e for e in self._ls if e.target in actor_ids]
-        else:
-            new_list = [e for e in self._ls if e.target==name]
+            all_ids += actor_ids
+        
+        new_list = [e for e in self._ls if e.target in all_ids]
         return EventList(new_list, self._r)
 
     def to_players(self) -> EventList:

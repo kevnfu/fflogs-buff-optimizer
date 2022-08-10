@@ -25,16 +25,19 @@ class User(Enum):
     KEVIN = 215343
 
 class ReportCodes(Enum):
-    JULY12 = "rHq4kRnmKcbpgwZY"
-    JULY16 = "tbXZ3WJf9czhQyD6"
-    JULY18 = "TwzV7fmdhpA1gykF"
-    JULY19 = "19M43vwFh6GtAcCp"
-    JULY20 = "Tm8K39AaBpYwD4MR"
-    JULY23 = "NvPKDTd3nfGF78Jp"
-    JULY25 = "Q6GnmtMY9y3NrBLz"
-    JULY27MIRA = "NJCPxY9vFVb3zZKG"
-    JULY30 = "tpLkJQNg96v2q4Pc"
-    AUG02 = "XhkGKxmc3HyAV16q"
+    JULY12 = 'rHq4kRnmKcbpgwZY'
+    JULY16 = 'tbXZ3WJf9czhQyD6'
+    JULY18 = 'TwzV7fmdhpA1gykF'
+    JULY19 = '19M43vwFh6GtAcCp'
+    JULY20 = 'Tm8K39AaBpYwD4MR'
+    JULY23 = 'NvPKDTd3nfGF78Jp'
+    JULY25 = 'Q6GnmtMY9y3NrBLz'
+    JULY27MIRA = 'NJCPxY9vFVb3zZKG'
+    JULY30 = 'tpLkJQNg96v2q4Pc'
+    AUG02 = 'XhkGKxmc3HyAV16q'
+    AUG04MIRA = 'P8BTFVXRvfMkr1gd'
+    AUG08 = '4DWQwRnAgf3j2b1J'
+    AUG09 = '87YtrHC16y3bXQGp'
     
 class Vod(Enum):
     def __init__(self, code: ReportCodes, offset: str, fight_id: int,  url: str=None) -> None:
@@ -78,6 +81,8 @@ class Anna(Vod):
     JULY25 = ReportCodes.JULY25, '03:32', 1, '1542923962'
     JULY30 = ReportCodes.JULY30, '3:30', 1, '1547492075'
     AUG02 = ReportCodes.AUG02, '2:06', 1, '1550755120'
+    AUG08 = ReportCodes.AUG08, '2:57', 1, '1556535385'
+    AUG09 = ReportCodes.AUG09, '3:27', 1, '1557483799'
 
 class Aaron(Vod):
     def __init__(self, *args) -> None:
@@ -89,6 +94,8 @@ class Aaron(Vod):
     JULY25 = ReportCodes.JULY25, '3:51', 1, '1542923664'
     JULY30 = ReportCodes.JULY30, '2:07', 1, '1547493441'
     AUG02 = ReportCodes.AUG02, '3:53', 1, '1550753649'
+    AUG08 = ReportCodes.AUG08, '5:07', 1, '1556533630'
+    AUG09 = ReportCodes.AUG09, '0:55', 1, '1557483799'
 
 class Sarah(Vod):
     def __init__(self, *args) -> None:
@@ -108,3 +115,4 @@ class Mira(Vod):
         super().__init__(*args)
         self.platform = Platform.TWITCH
     JULY27 = ReportCodes.JULY27MIRA, '00:55', 24, '1543800290'
+    AUG04 = ReportCodes.AUG04MIRA, '6:31', 1, '1552616781'

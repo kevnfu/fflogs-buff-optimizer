@@ -119,7 +119,7 @@ class PhaseModel:
 class PhaseModelDsu(PhaseModel):
     def __init__(self, report: Report):
         if report.encounter is not Encounter.DSU:
-            raise TypeError(f'Using DSU model for {encounter=}')
+            raise TypeError(f'Using DSU model for {report.encounter=}')
 
         super().__init__(report)
 
@@ -167,8 +167,8 @@ class PhaseModelDsu(PhaseModel):
 
 class PhaseModelTea(PhaseModel):
     def __init__(self, report: Report):
-        if encounter is not Encounter.TEA:
-            raise TypeError(f'Using TEA model for {encounter=}')
+        if report.encounter is not Encounter.TEA:
+            raise TypeError(f'Using TEA model for {report.encounter=}')
         
         super().__init__(report)
         self.PHASE_NAMES = ['P1', 'I1', 'P2', 'I2', 'P3', 'P4']
@@ -180,8 +180,21 @@ class PhaseModelTea(PhaseModel):
         # Both bj/cc untargetable
         # Alex Prime targetable
         # first down for the count fades
-        
+        EVENT_INDEX = [
+            0, # Cruise chaser first Hawk Blaster
+            1, # BJ/CC Targetable
+            5, # Alex Prime targetable
+            17,] # first down for the count fades
 
         fight = self._report.fight(fight_id)
 
-        raise NotImplementedError('Use subclass of PhaseReport')
+        events = self._report.events(fight.i)
+        first_hawk_blaster = events.casts('Hawk Blaster')[:1]
+        targetable = events.types('targetabilityupdate').to(['Brute Justice', 'Cruise Chaser', 'Alexander Prime'])
+        cutscene_end = events.ability('Down for the Count').types('removedebuff')[:1]
+
+        phase_events = first_hawk_blaster+targetable+cutscene_end
+        phase_events.sort_time()
+
+        timeline = [phase_events[i] for i in EVENT_INDEX if i < len(phase_events)]
+        return EventList(timeline, self._report)
