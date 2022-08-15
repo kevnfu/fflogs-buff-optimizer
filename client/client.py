@@ -8,10 +8,11 @@ from gql import gql
 from gql import Client as GQLClient
 from gql.transport.requests import RequestsHTTPTransport
 
-import json
-# from io import StringIO
-from copy import deepcopy
 import os
+import json
+from copy import deepcopy
+
+from . config import CLIENT_ID, CLIENT_SECRET
 
 
 class FFClient:
@@ -19,9 +20,9 @@ class FFClient:
     OAUTH_TOKEN_URL = 'https://www.fflogs.com/oauth/token'
     CACHE_DIR = './querycache'
 
-    def __init__(self, client_id: str, client_secret: str) -> None:
-        self._auth = HTTPBasicAuth(client_id, client_secret)
-        client = oauth2.BackendApplicationClient(client_id)
+    def __init__(self) -> None:
+        self._auth = HTTPBasicAuth(CLIENT_ID, CLIENT_SECRET)
+        client = oauth2.BackendApplicationClient(CLIENT_ID)
         self._session = OAuth2Session(client=client)
         self._transport = RequestsHTTPTransport(url=self.CLIENT_API_URL)
         self._client = GQLClient(transport=self._transport, fetch_schema_from_transport=True)

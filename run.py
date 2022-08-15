@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from operator import itemgetter
 
-from config import CLIENT_ID, CLIENT_SECRET
 from client.client import FFClient
 from report.data import EventList
 from report.enums import Encounter, Platform, ReportCodes, Vod, Yoon, Anna, Mira, Kevin, Aaron, Blake, Sarah
@@ -27,7 +26,7 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
 
 # report_code = ReportCodes.AUG02.value
 
-client = FFClient(CLIENT_ID, CLIENT_SECRET)
+client = FFClient()
 report = Report(ReportCodes.AUG09.value, client, Encounter.DSU)
 
 wrath = report.events().casts("Wrath of the Heavens")
@@ -37,6 +36,6 @@ loop_povs([Anna], report, wrath)
 #     print(i[0])
 
 
-# client.save_cache()
+client.save_cache()
 
 
