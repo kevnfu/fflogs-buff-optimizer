@@ -6,7 +6,7 @@ import json
 from math import floor
 
 # custom
-from report.enums import Encounter, Platform
+from report.enums import Encounter, Platform, Vod
 from report.queries import Q_MASTER_DATA, Q_FIGHTS, Q_EVENTS, Q_ABILITIES
 from report.data import Event, EventList, Fight, Ability, Actor
 from report.modules.phases import PhaseModelDsu, PhaseModelTea
@@ -14,7 +14,7 @@ from report.modules.aura import AuraModel
 
 class Report:
     """Report for one type of encounter"""
-    def __init__(self, code: str, client: 'FFClient', encounter: Encounter) -> None:
+    def __init__(self, code: str | Vod, client: 'FFClient', encounter: Encounter) -> None:
         self._client = client
         self.code = code
         self._load_phase_model(encounter)
