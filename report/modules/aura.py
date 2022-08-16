@@ -6,46 +6,6 @@ import json
 from report.enums import Encounter
 from report.data import Event, EventList
 
-# does not include healing events
-Q_AURAS = """
-query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
-    rateLimitData {
-        limitPerHour
-        pointsSpentThisHour
-    }
-    reportData {
-        report(code: $reportCode) {
-            auras: events(limit: 10000, # hostilityType: Enemies,
-                startTime: $startTime, endTime: $endTime,
-                filterExpression: "inCategory('auras')=true AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
-                fightIDs: $fightIDs) {
-                data
-                nextPageTimestamp
-            }
-        }
-    }
-}
-"""
-
-Q_COMBATANT_INFO = """
-query CombatantInfo ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
-    rateLimitData {
-        limitPerHour
-        pointsSpentThisHour
-    }
-    reportData {
-        report(code: $reportCode) {
-            info: events(limit: 10000, # hostilityType: Enemies,
-                startTime: $startTime, endTime: $endTime,
-                filterExpression: "type='combatantinfo'",
-                fightIDs: $fightIDs) {
-                data
-            }
-        }
-    }
-}
-"""
-
 def require_auras(func):
     '''Decorator that gets auras for a fight if needed before the function'''
     def ensured(*args, **kwargs):

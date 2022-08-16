@@ -16,15 +16,19 @@ class Report:
     """Report for one type of encounter"""
     def __init__(self, code: str | Vod, client: 'FFClient', encounter: Encounter) -> None:
         self._client = client
-        self.code = code
-        self._load_phase_model(encounter)
+        if isinstance(code, Vod):
+            self.code = code.code
+            self.set_vod(code)
+        else:
+            self.code = code
 
+        self._load_phase_model(encounter)
         self.am = AuraModel(self)
         self.data = dict() # to be filled w/ individual calls
 
         self._fetch_master_data()
         self._fights = self._fetch_all_fights() # {fight id: fight}
-        self._events = dict() # {fight id: EventList w/ all events}
+        self._events = dict()
 
     def _load_phase_model(self, encounter: Encounter):
         self.encounter = encounter

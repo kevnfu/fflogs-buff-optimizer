@@ -105,17 +105,41 @@ query Abilities ($page: Int){
 }
 """
 
+Q_AURAS = """
+query Auras ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            auras: events(limit: 10000, # hostilityType: Enemies,
+                startTime: $startTime, endTime: $endTime,
+                filterExpression: "inCategory('auras')=true AND type in ('applybuff','applydebuff','removebuff','removedebuff')",
+                fightIDs: $fightIDs) {
+                data
+                nextPageTimestamp
+            }
+        }
+    }
+}
+"""
 
-
-
-Q_ENCOUNTER = """
-query {{
-    worldData {{
-        encounter(id: {encounterID}) {{
-            zone {{
-                name
-            }}
-        }}
-    }}
-}}
+Q_COMBATANT_INFO = """
+query CombatantInfo ($reportCode: String!, $startTime: Float, $endTime: Float, $fightIDs: [Int]) {
+    rateLimitData {
+        limitPerHour
+        pointsSpentThisHour
+    }
+    reportData {
+        report(code: $reportCode) {
+            info: events(limit: 10000, # hostilityType: Enemies,
+                startTime: $startTime, endTime: $endTime,
+                filterExpression: "type='combatantinfo'",
+                fightIDs: $fightIDs) {
+                data
+            }
+        }
+    }
+}
 """

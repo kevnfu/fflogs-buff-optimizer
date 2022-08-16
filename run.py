@@ -8,7 +8,7 @@ from report.data import EventList
 from report.enums import Encounter, Platform, ReportCodes, Vod, Yoon, Anna, Mira, Kevin, Aaron, Blake, Sarah
 from report.report import Report
 
-from report.queries import Q_EVENTS, Q_ABILITIES
+from report.queries import Q_EVENTS, Q_ABILITIES, Q_FIGHTS
 
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     links = list()
@@ -25,18 +25,20 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
         print(i[0])
 
 client = FFClient()
+# report = Report(ReportCodes.AUG16.value, client, Encounter.DSU)
 
-report = Report(ReportCodes.AUG16.value, client, Encounter.DSU)
+# wrath = report.events().casts("Death of the Heavens")
+# loop_povs([Anna, Kevin, Aaron, Yoon], report, wrath)
 
-wrath = report.events().casts("Death of the Heavens")
-
-# for fight in report._fights:
-#     print(fight)
-
-loop_povs([Anna, Kevin, Aaron, Yoon], report, wrath)
 # for i in wrath.links():
     # print(i[0])
 
 # client.save_cache()
 
 
+res = client.q(Q_FIGHTS, {
+    'reportCode': 'YaAhTkyzxRjq4wKW',
+    'fightIDs': [2]
+    }, cache=False)
+
+print(res)
