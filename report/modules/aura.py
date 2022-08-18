@@ -116,6 +116,10 @@ class AuraModel:
         # return list(targets)
         return self.aura(aura_name, fight_id).named().to_targets()
 
+    def gcds(self, aura_event: Event) -> EventList:
+        """list of actions used during an aura"""
+        pass
+
 
 
 
