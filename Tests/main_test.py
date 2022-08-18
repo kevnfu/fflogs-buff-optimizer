@@ -27,4 +27,6 @@ def test_client(client, report_code):
     assert res == expected
 
 def test_report(report):
-    report.fight(2)
+    fight = report.fight(2)
+    expected = {'id': 2, 'encounter': 1065, 'startTime': 2211161, 'endTime': 2379882, 'fightPercentage': 90.85, 'lastPhaseAsAbsoluteIndex': 0, 'friendlyPlayers': [157, 156, 155, 154, 153, 152, 23, 150, 82]}
+    assert fight.to_dict() == expected

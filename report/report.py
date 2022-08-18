@@ -38,7 +38,9 @@ class Report:
             case Encounter.TEA:
                 self.pm = PhaseModelTea(self)
             case _:
-                raise NotImplementedError(f'No phase model for {self.encounter}')
+                print(f'No phase model for {self.encounter}')
+                self.pm = None
+                # raise NotImplementedError()
 
     def _fetch_master_data(self) -> None:
         res = self._client.q(Q_MASTER_DATA, {
@@ -49,13 +51,6 @@ class Report:
         self.guild = report['guild']
         self.start_time = report['startTime']
         self.end_time = report['endTime']
-
-        # with open('master.json', 'w') as f:
-        #     f.write(json.dumps(res, indent=4))
-        # with open('actors.json', 'w') as f:
-        #     f.write(json.dumps(report['masterData']['actors'], indent=4))
-        # with open('abilites.json', 'w') as f:
-        #     f.write(json.dumps(report['masterData']['abilities'], indent=4))
 
         self.actors = [Actor(a) for a in report['masterData']['actors']]
         self.abilities = [Ability(a) for a in report['masterData']['abilities']]

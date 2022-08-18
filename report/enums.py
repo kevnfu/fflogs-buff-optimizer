@@ -38,11 +38,12 @@ class ReportCodes(Enum):
     AUG4MIRA = 'P8BTFVXRvfMkr1gd'
     AUG8 = '4DWQwRnAgf3j2b1J'
     AUG9 = '87YtrHC16y3bXQGp'
-    AUG16 = 'YaAhTkyzxRjq4wKW'
+    AUG15 = 'YaAhTkyzxRjq4wKW'
+    AUG16 = '8kfYdVwLhTG9PXtc'
     
 class Vod(Enum):
-    def __init__(self, code: ReportCodes, offset: str, fight_id: int,  url: str=None) -> None:
-        self.code = code.value
+    def __init__(self, offset: str, fight_id: int,  url: str=None) -> None:
+        self.code = ReportCodes[self.name].value
         self.offset = offset
         self.fight_id = fight_id
         self.url = url
@@ -52,72 +53,76 @@ class Kevin(Vod):
         super().__init__(*args)
         self.platform = Platform.YOUTUBE_LINK
 
-    JULY16 = ReportCodes.JULY16, '3:14', 1, 'oflg8S4SkS4'
-    JULY18 = ReportCodes.JULY18, '3:19', 1, 'Nay_Yc4lJR4'
-    JULY19 = ReportCodes.JULY19, '0:47', 1, 'bZ8zohRxerk'
-    JULY25 = ReportCodes.JULY25, '1:25', 1, '7YqJ-wkDwvc'
-    JULY30 = ReportCodes.JULY30, '0:34', 1, 'GxnxeCD8sqw'
-    AUG2 = ReportCodes.AUG2, '1:48', 1, '_dvbrYVDoVM'
-    AUG16 = ReportCodes.AUG16, '0:53', 2, 'NBFbhur1CmI'
+    JULY16 = '3:14', 1, 'oflg8S4SkS4'
+    JULY18 = '3:19', 1, 'Nay_Yc4lJR4'
+    JULY19 = '0:47', 1, 'bZ8zohRxerk'
+    JULY25 = '1:25', 1, '7YqJ-wkDwvc'
+    JULY30 = '0:34', 1, 'GxnxeCD8sqw'
+    AUG2 = '1:48', 1, '_dvbrYVDoVM'
+    AUG15 = '0:53', 2, 'NBFbhur1CmI'
+    AUG16 = '5:44', 1, 'l5JeYUCQlfc'
 
 class Yoon(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
 
-    JULY16 = ReportCodes.JULY16, '3:57', 1, '1533793190'
-    JULY18 = ReportCodes.JULY18, '3:01', 1, '1536014750'
-    JULY19 = ReportCodes.JULY19, '1:48', 1, '1536993110'
-    JULY20 = ReportCodes.JULY20, '2:56', 2, '1538012812'
-    JULY23 = ReportCodes.JULY23, '13:25', 1, '1540569628'
-    JULY25 = ReportCodes.JULY25, '02:56', 1, '1542924507'
-    JULY30 = ReportCodes.JULY30, '0:53', 1, '1547494612'
-    AUG16 = ReportCodes.AUG16, '0:26', 2, '1563342772'
+    JULY16 = '3:57', 1, '1533793190'
+    JULY18 = '3:01', 1, '1536014750'
+    JULY19 = '1:48', 1, '1536993110'
+    JULY20 = '2:56', 2, '1538012812'
+    JULY23 = '13:25', 1, '1540569628'
+    JULY25 = '02:56', 1, '1542924507'
+    JULY30 = '0:53', 1, '1547494612'
+    AUG15 = '0:26', 2, '1563342772'
+    AUG16 = '3:33', 1, '1564194435'
 
 class Anna(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY19 = ReportCodes.JULY19, '6:36', 1, '1536992608'
-    JULY20 = ReportCodes.JULY20, '19:18', 2, '1537996395'
-    JULY23 = ReportCodes.JULY23, '26:43', 1, '1540556773'
-    JULY25 = ReportCodes.JULY25, '03:32', 1, '1542923962'
-    JULY30 = ReportCodes.JULY30, '3:30', 1, '1547492075'
-    AUG2 = ReportCodes.AUG2, '2:06', 1, '1550755120'
-    AUG8 = ReportCodes.AUG8, '2:57', 1, '1556535385'
-    AUG9 = ReportCodes.AUG9, '3:27', 1, '1557483799'
-    AUG16 = ReportCodes.AUG16, '8:11', 25, '1563342772'
+    JULY19 = '6:36', 1, '1536992608'
+    JULY20 = '19:18', 2, '1537996395'
+    JULY23 = '26:43', 1, '1540556773'
+    JULY25 = '03:32', 1, '1542923962'
+    JULY30 = '3:30', 1, '1547492075'
+    AUG2 = '2:06', 1, '1550755120'
+    AUG8 = '2:57', 1, '1556535385'
+    AUG9 = '3:27', 1, '1557483799'
+    AUG15 = '8:11', 25, '1563342772'
+    AUG16 = '9:43', 1, '1564187787'
 
 class Aaron(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY19 = ReportCodes.JULY19, '1:21', 13, '1537048452'
-    JULY20 = ReportCodes.JULY20, '4:09', 2, '1538011686'
-    JULY23 = ReportCodes.JULY23, '16:01', 1, '1540567419'
-    JULY25 = ReportCodes.JULY25, '3:51', 1, '1542923664'
-    JULY30 = ReportCodes.JULY30, '2:07', 1, '1547493441'
-    AUG2 = ReportCodes.AUG2, '3:53', 1, '1550753649'
-    AUG8 = ReportCodes.AUG8, '5:07', 1, '1556533630'
-    AUG9 = ReportCodes.AUG9, '0:55', 1, '1557483799'
-    AUG16 = ReportCodes.AUG16, '0:58', 2,'1563237971'
+    JULY19 = '1:21', 13, '1537048452'
+    JULY20 = '4:09', 2, '1538011686'
+    JULY23 = '16:01', 1, '1540567419'
+    JULY25 = '3:51', 1, '1542923664'
+    JULY30 = '2:07', 1, '1547493441'
+    AUG2 = '3:53', 1, '1550753649'
+    AUG8 = '5:07', 1, '1556533630'
+    AUG9 = '0:55', 1, '1557483799'
+    AUG15 = '0:58', 2,'1563237971'
+    AUG16 = '2:01', 1, '1564195958'
 
 class Sarah(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY25 = ReportCodes.JULY25, '1:28', 1, '1542925929'
+    JULY25 = '1:28', 1, '1542925929'
 
 class Blake(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY12 = ReportCodes.JULY12, '11:36', 1, '1529282919'
-    JULY16 = ReportCodes.JULY16, '10:49', 1, '1533786990'
+    JULY12 = '11:36', 1, '1529282919'
+    JULY16 = '10:49', 1, '1533786990'
 
 class Mira(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY27 = ReportCodes.JULY27MIRA, '00:55', 24, '1543800290'
-    AUG4 = ReportCodes.AUG4MIRA, '6:31', 1, '1552616781'
+    JULY27 = '00:55', 24, '1543800290'
+    AUG4 = '6:31', 1, '1552616781'
