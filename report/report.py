@@ -185,6 +185,10 @@ class Report:
         filter_str = f'type="cast" AND ability.name="{ability_name}"'
         return self.filter(filter_str, *args)
 
+    def begincasts(self, ability_name: str, *args) -> EventList:
+        filter_str = f'type="begincast" AND ability.name="{ability_name}"'
+        return self.filter(filter_str, *args)
+
     def types(self, type_name: str, *args) -> EventList:
         filter_str = f'type="{type_name}"'
         return self.filter(filter_str, *args)
@@ -287,6 +291,7 @@ class Report:
                 return self._twitch_url(time, self.output_code)
             case _:
                 raise ValueError('Not a supported platform')
+
 
 
 

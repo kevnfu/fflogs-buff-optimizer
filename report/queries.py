@@ -23,6 +23,9 @@ query MasterData ($reportCode: String!) {
                     }
                 }
             }
+            fights {
+                encounterID
+            }
             masterData {
                 actors {
                     id
@@ -63,6 +66,8 @@ query Fights ($reportCode: String!, $encounterID: Int, $fightIDs: [Int]) {
     }
 }
 """
+
+
 
 Q_EVENTS = """
 query Events ($reportCode: String!, $encounterID: Int, $startTime: Float, $endTime: Float, $filter: String, $fightIDs: [Int]) {

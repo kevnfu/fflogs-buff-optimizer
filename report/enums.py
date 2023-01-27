@@ -1,6 +1,7 @@
 from enum import Enum, auto
 
 class Encounter(Enum):
+    OMEGA = 1068
     DSU = 1065
     TEA = 1062
     UCOB = 1060
@@ -10,6 +11,10 @@ class Encounter(Enum):
     P3 = 80
     P4I = 81
     P4II = 82
+    P5 = 83
+    P6 = 84
+    P7 = 85
+    P8 = 86
 
 class Platform(Enum):
     YOUTUBE = auto()
@@ -40,6 +45,9 @@ class ReportCodes(Enum):
     AUG9 = '87YtrHC16y3bXQGp'
     AUG15 = 'YaAhTkyzxRjq4wKW'
     AUG16 = '8kfYdVwLhTG9PXtc'
+    AUG30 = 'w4jC8xtcGv7zLWY9'
+    AUG31MIRA = '3ztRK87WNCFbPg6n'
+    OMEGA_1 = 'Vh1GCwfkRALdbT4N'
     
 class Vod(Enum):
     def __init__(self, offset: str, fight_id: int,  url: str=None) -> None:
@@ -76,6 +84,7 @@ class Yoon(Vod):
     JULY30 = '0:53', 1, '1547494612'
     AUG15 = '0:26', 2, '1563342772'
     AUG16 = '3:33', 1, '1564194435'
+    AUG30 = '3:19', 1, '1577479090'
 
 class Anna(Vod):
     def __init__(self, *args) -> None:
@@ -124,5 +133,7 @@ class Mira(Vod):
     def __init__(self, *args) -> None:
         super().__init__(*args)
         self.platform = Platform.TWITCH
-    JULY27 = '00:55', 24, '1543800290'
-    AUG4 = '6:31', 1, '1552616781'
+    JULY27MIRA = '00:55', 24, '1543800290'
+    AUG4MIRA = '6:31', 1, '1552616781'
+    AUG31MIRA = '1:14', 1, '1578536320'
+    OMEGA_1 = '2:07', 1, '1717620670'

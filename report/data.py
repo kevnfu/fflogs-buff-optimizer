@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable, Any
 
 import json
+from math import floor
 from dataclasses import dataclass
 
 class Event:
@@ -69,13 +70,19 @@ class EventList:
         new_list = [e for e in self._ls if e.fight in fight_ids]
         return EventList(new_list, self._r)
 
-    def ability(self, ability_name: str) -> EventList:
-        ability_ids = self._r.get_ability(ability_name)
+    def ability(self, ability_name: str | list(str)) -> EventList:
+        if isinstance(ability_name, str):
+            ability_name = [ability_name]
+        
+        ability_ids = []
+        for a in ability_name:
+            ability_ids += self._r.get_ability(a)
+
         new_list = filter(lambda x: hasattr(x, 'abilityGameID'), self._ls)
         new_list = [e for e in new_list if e.abilityGameID in ability_ids]
         return EventList(new_list, self._r)
 
-    def casts(self, ability_name: str):
+    def casts(self, ability_name: str | list(str)):
         return self.ability(ability_name).types("cast")
 
     def by(self, names: str) -> EventList:
@@ -158,6 +165,7 @@ class EventList:
         link_ls = list()
         for event in self._ls:
             time = self._r._relative_time(event.time + offset)
+            print(self._r._to_output(time))
             link_ls.append((f'{self._r._to_output(time)} #{event.fight}', event.time))
         return link_ls
 
@@ -189,6 +197,32 @@ class EventList:
         for e in self._ls:
             f.write(str(e) + '\n')
         return self
+
+    def timeline(self, offset=0) -> EventList:
+        for e in self._ls:
+            start_cast = self._to_mmss(e.fighttime + offset)
+            line = f'{start_cast}'
+            if hasattr(e, 'duration'):
+                end_cast = self._to_mmss(e.fighttime + e.duration + offset)
+                line += f'\t{end_cast}'
+            else:
+                line = '\t' + line
+            line += f'\t{e.abilityGameID}'
+            print(line)
+
+    @staticmethod
+    def _to_mmss(ms: int) -> int:
+        second = round(ms/(1000) % 60)
+        minute = floor(ms/(1000*60) % 60)
+        remainder = ms/1000 % 1
+        remainder = f'{remainder:.2f}'.lstrip('0')
+        out = ''
+        if minute != 0:
+            out += f'{minute}:'
+        out += f'{second:02d}'
+        
+        return out
+
 
     def __str__(self):
         return '\n'.join([str(e) for e in self._ls])

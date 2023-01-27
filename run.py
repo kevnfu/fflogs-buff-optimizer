@@ -25,14 +25,7 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
         print(i[0])
 
 client = FFClient()
-report = Report(ReportCodes.AUG16.value, client, Encounter.DSU)
 
-p6s = report.pm.phase_starts("P6")
+report = Report(ReportCodes.OMEGA_1.value, client, Encounter.OMEGA)
 
-loop_povs([Kevin], report, p6s)
-
-# for i in wrath.links():
-    # print(i[0])
-
-# x = report.events()
-# client.save_cache()
+report.set_vod(Mira.OMEGA_1)
