@@ -100,6 +100,9 @@ class EventList:
         new_list = [e for e in self._ls if e.target in all_ids]
         return EventList(new_list, self._r)
 
+    def by_id(self, actor_id: int) -> EventList:
+        new_list = [e for e in self._ls if e.source is actor_id]
+        return EventList(new_list, self._r)
 
     def by_players(self) -> EventList:
         new_list = [e for e in self._ls if self._r.get_actor(e.source).type_=='Player']
@@ -161,12 +164,12 @@ class EventList:
         new_list = [*filter(func, self._ls)]
         return EventList(new_list, self._r)
 
-    def links(self, offset: int=0) -> list[tuple[str, int]]:
+    def links(self, offset: int=0) -> list[tuple[str, int, int]]:
         link_ls = list()
         for event in self._ls:
             time = self._r._relative_time(event.time + offset)
             print(self._r._to_output(time))
-            link_ls.append((f'{self._r._to_output(time)} #{event.fight}', event.time))
+            link_ls.append((f'{self._r._to_output(time)}', event.fight, event.time))
         return link_ls
 
     def named(self) -> EventList:

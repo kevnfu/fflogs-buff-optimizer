@@ -26,6 +26,14 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
 
 client = FFClient()
 
-report = Report(ReportCodes.OMEGA_1.value, client, Encounter.OMEGA)
+report = Report(ReportCodes.Day2.value, client, Encounter.OMEGA)
 
-report.set_vod(Mira.OMEGA_1)
+report.set_vod(MiraYT.Day2)
+
+# for a in report.actors:
+#     print(a)
+
+partysyn = report.casts("Party Synergy").by_id(104)
+
+partysyn.links()
+

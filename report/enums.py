@@ -48,6 +48,7 @@ class ReportCodes(Enum):
     AUG30 = 'w4jC8xtcGv7zLWY9'
     AUG31MIRA = '3ztRK87WNCFbPg6n'
     OMEGA_1 = 'Vh1GCwfkRALdbT4N'
+    Day2 = '8K7XcmBPGpaf9tJD'
     
 class Vod(Enum):
     def __init__(self, offset: str, fight_id: int,  url: str=None) -> None:
@@ -137,3 +138,10 @@ class Mira(Vod):
     AUG4MIRA = '6:31', 1, '1552616781'
     AUG31MIRA = '1:14', 1, '1578536320'
     OMEGA_1 = '2:07', 1, '1717620670'
+
+class MiraYT(Vod):
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self.platform = Platform.YOUTUBE_LINK
+
+    Day2 = '9:10', 7, 'VDbOyFbOakw'
