@@ -1,5 +1,6 @@
 querycache/
 config.py
+token.py
 *.txt
 *.json
 

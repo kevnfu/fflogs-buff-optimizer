@@ -10,6 +10,8 @@ from report.report import Report
 
 from report.queries import Q_EVENTS, Q_ABILITIES, Q_FIGHTS
 
+import integration.webhook as webhook
+
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     links = list()
     for v in vod_list:
@@ -25,15 +27,14 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
         print(i[0])
 
 client = FFClient()
-
 report = Report(ReportCodes.Day2.value, client, Encounter.OMEGA)
 
 report.set_vod(MiraYT.Day2)
+# print(report.actors)
+partysyn = report.casts("Party Synergy").by_id(25)
+info = partysyn.links()
 
-# for a in report.actors:
-#     print(a)
+for i in info:
+    print(f'#{i[1]}: {i[0]}')
 
-partysyn = report.casts("Party Synergy").by_id(104)
-
-partysyn.links()
-
+webhook.send_links(info)

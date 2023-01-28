@@ -12,7 +12,7 @@ import os
 import json
 from copy import deepcopy
 
-from . config import CLIENT_ID, CLIENT_SECRET
+from config import CLIENT_ID, CLIENT_SECRET
 
 
 class FFClient:

@@ -48,7 +48,7 @@ class ReportCodes(Enum):
     AUG30 = 'w4jC8xtcGv7zLWY9'
     AUG31MIRA = '3ztRK87WNCFbPg6n'
     OMEGA_1 = 'Vh1GCwfkRALdbT4N'
-    Day2 = '8K7XcmBPGpaf9tJD'
+    Day2 = 'hDpC6KxFvtc1XL8P'
     
 class Vod(Enum):
     def __init__(self, offset: str, fight_id: int,  url: str=None) -> None:
@@ -144,4 +144,4 @@ class MiraYT(Vod):
         super().__init__(*args)
         self.platform = Platform.YOUTUBE_LINK
 
-    Day2 = '9:10', 7, 'VDbOyFbOakw'
+    Day2 = '9:10', 1, 'VDbOyFbOakw'
