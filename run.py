@@ -9,8 +9,9 @@ from report.enums import *
 from report.report import Report
 
 from report.queries import Q_EVENTS, Q_ABILITIES, Q_FIGHTS
+from config import WEBHOOK_URL, WEBHOOK_URL_TEST
 
-import integration.webhook as webhook
+from integration.webhook import Webhook
 
 def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
     links = list()
@@ -29,12 +30,15 @@ def loop_povs(vod_list: [Vod], report: Report, events: EventList) -> None:
 client = FFClient()
 report = Report(ReportCodes.Day2.value, client, Encounter.OMEGA)
 
-report.set_vod(MiraYT.Day2)
-# print(report.actors)
-partysyn = report.casts("Party Synergy").by_id(25)
+report.set_vod(Slade.Day2)
+for a in report.actors:
+    print(a)
+
+partysyn = report.begincasts("Party Synergy").by_id(25)
 info = partysyn.links()
 
-for i in info:
-    print(f'#{i[1]}: {i[0]}')
+# for i in info:
+#     print(f'#{i[1]}: {i[0]}')
 
-webhook.send_links(info)
+webhook = Webhook(WEBHOOK_URL)
+webhook.send_links(info, title="Queen Mira")

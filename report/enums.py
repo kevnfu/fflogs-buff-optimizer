@@ -145,3 +145,9 @@ class MiraYT(Vod):
         self.platform = Platform.YOUTUBE_LINK
 
     Day2 = '9:10', 1, 'VDbOyFbOakw'
+
+class Slade(Vod):
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self.platform = Platform.TWITCH
+    Day2 = '0:36', 2, '1720567900'
